@@ -8,12 +8,31 @@ export interface AttributeBuffer {
   size: number;
 }
 
+export interface RenderUniform {
+  name: string;
+  type: 'mat4' | 'float' | 'vec3';
+  value: Float32Array | number;
+}
+
+export interface RenderOptions {
+  vertexShader: string;
+  fragmentShader: string;
+  attributes: AttributeBuffer[];
+  vertexCount: number;
+  uniforms?: RenderUniform[];
+  depth?: boolean;
+  width?: number;
+  height?: number;
+}
+
 export interface WebGLViewportProps {
   vertexShader: string;
   fragmentShader: string;
   /** Attribute buffers bound in order (location 0, 1, 2, …) */
   attributes: AttributeBuffer[];
   vertexCount: number;
+  uniforms?: RenderUniform[];
+  depth?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -57,19 +76,32 @@ function buildProgram(
   return program;
 }
 
+function applyUniforms(gl: WebGL2RenderingContext, program: WebGLProgram, uniforms?: RenderUniform[]) {
+  if (!uniforms) return;
+  for (const u of uniforms) {
+    const loc = gl.getUniformLocation(program, u.name);
+    if (loc === null) continue;
+    if (u.type === 'mat4') gl.uniformMatrix4fv(loc, false, u.value as Float32Array);
+    else if (u.type === 'float') gl.uniform1f(loc, u.value as number);
+    else if (u.type === 'vec3') { const v = u.value as Float32Array; gl.uniform3f(loc, v[0], v[1], v[2]); }
+  }
+}
+
 /**
  * Render a single draw call to an offscreen canvas and return a data URL.
  * Creates and immediately disposes its own GL context so it never accumulates.
  * Returns null if WebGL2 is unavailable or an error occurs.
  */
-export function renderToDataURL(
-  vertexShader: string,
-  fragmentShader: string,
-  attributes: AttributeBuffer[],
-  vertexCount: number,
+export function renderToDataURL({
+  vertexShader,
+  fragmentShader,
+  attributes,
+  vertexCount,
+  uniforms,
+  depth = true,
   width = 320,
   height = 200,
-): string | null {
+}: RenderOptions): string | null {
   try {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -77,11 +109,12 @@ export function renderToDataURL(
     const gl = canvas.getContext('webgl2', {
       alpha: false,
       antialias: true,
-      depth: false,
+      depth,
       stencil: false,
     });
     if (!gl) return null;
 
+    if (depth) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); }
     const program = buildProgram(gl, vertexShader, fragmentShader);
     const vao = gl.createVertexArray();
     if (!vao) return null;
@@ -100,8 +133,9 @@ export function renderToDataURL(
 
     gl.bindVertexArray(null);
     gl.clearColor(0.08, 0.08, 0.08, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT | (depth ? gl.DEPTH_BUFFER_BIT : 0));
     gl.useProgram(program);
+    applyUniforms(gl, program, uniforms);
     gl.bindVertexArray(vao);
     gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
@@ -130,6 +164,8 @@ export function WebGLViewport({
   fragmentShader,
   attributes,
   vertexCount,
+  uniforms,
+  depth = false,
   className,
   style,
 }: WebGLViewportProps) {
@@ -145,7 +181,7 @@ export function WebGLViewport({
       gl = canvas.getContext('webgl2', {
         alpha: false,
         antialias: true,
-        depth: false,
+        depth,
         stencil: false,
         powerPreference: 'default',
       });
@@ -179,9 +215,11 @@ export function WebGLViewport({
 
       gl.bindVertexArray(null);
 
+      if (depth) { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); }
       gl.clearColor(0.08, 0.08, 0.08, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.clear(gl.COLOR_BUFFER_BIT | (depth ? gl.DEPTH_BUFFER_BIT : 0));
       gl.useProgram(program);
+      applyUniforms(gl, program, uniforms);
       gl.bindVertexArray(vao);
       gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
 
@@ -197,7 +235,7 @@ export function WebGLViewport({
       setGlError(msg);
       console.error('[WebGLViewport]', err);
     }
-  }, [vertexShader, fragmentShader, attributes, vertexCount]);
+  }, [vertexShader, fragmentShader, attributes, vertexCount, uniforms, depth]);
 
   useEffect(() => {
     draw();
