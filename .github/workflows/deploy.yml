@@ -32,8 +32,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            rm -rf /var/www/html/downloads/dist
-            mkdir -p /var/www/html/downloads/dist
+            rm -rf ${{ secrets.DEPLOY_PATH }}/*
+            mkdir -p ${{ secrets.DEPLOY_PATH }}
 
       - name: Upload dist to server
         uses: appleboy/scp-action@v0.1.7
@@ -42,5 +42,5 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "dist/*"
-          target: "/var/www/html/downloads/dist"
+          target: "${{ secrets.DEPLOY_PATH }}"
           strip_components: 1
