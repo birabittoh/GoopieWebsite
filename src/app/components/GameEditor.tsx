@@ -15,7 +15,7 @@ interface GameEditorProps {
   readOnly?: boolean;
 }
 
-const statusOptions: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame'];
+const statusOptions: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame', 'External'];
 const ALL_PLATFORMS: Platform[] = ['Windows', 'Linux', 'Mac'];
 
 export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }: GameEditorProps) {

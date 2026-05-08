@@ -12,7 +12,7 @@ export interface Game {
   recompiled_developers: string[];
   Tags: string[];
   platforms?: Platform[];
-  status: 'Ingame' | 'Stable' | 'Playable' | 'Enhanced';
+  status: 'Ingame' | 'Stable' | 'Playable' | 'Enhanced' | 'External';
   coverImage: string;
   headerImage: string | string[];
   titleImage?: string;

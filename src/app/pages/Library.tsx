@@ -59,7 +59,7 @@ export function Library() {
   const { setAccentColor } = useBackgroundAccent();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [statusFilters, setStatusFilters] = useState<Game['status'][]>(['Enhanced', 'Stable', 'Playable']);
+  const [statusFilters, setStatusFilters] = useState<Game['status'][]>(['Enhanced', 'Stable', 'Playable', 'External']);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [hideExternal, setHideExternal] = useState(false);
   const [platformFilters, setPlatformFilters] = useState<Platform[]>(() => {
@@ -105,6 +105,7 @@ export function Library() {
     Stable: 1,
     Playable: 2,
     Ingame: 3,
+    External: 4,
   };
 
   const allTags = useMemo(() => {
@@ -141,6 +142,7 @@ export function Library() {
         const matchesStatus = statusFilters.length === 0 || statusFilters.includes(game.status);
         const matchesTags = tagFilters.length === 0 || tagFilters.some(tag => game.Tags.includes(tag));
         const matchesExternal = !hideExternal || !game.externalLauncherUrl;
+        if (isInCEF && game.status === 'External') return false;
         const matchesPlatform = platformFilters.length === 0 || platformFilters.some(p => game.platforms?.includes(p));
         return matchesStatus && matchesTags && matchesExternal && matchesPlatform;
       })
@@ -166,7 +168,7 @@ export function Library() {
         if (wA !== wB) return wB - wA;
         return vb - va;
       });
-  }, [searchQuery, visibleGames, statusFilters, tagFilters, hideExternal, platformFilters, gameRatings, favorites]);
+  }, [searchQuery, visibleGames, statusFilters, tagFilters, hideExternal, platformFilters, gameRatings, favorites, isInCEF]);
 
   // Auto-select game from URL param or first game if none selected
   useEffect(() => {
@@ -694,6 +696,7 @@ export function Library() {
                               Manage Saves
                             </Button>
                             )}
+                            {/* Vehicle Browser button hidden for now
                             {selectedGame.recompName === 'renut' && (
                             <Button
                               className="text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
@@ -704,6 +707,7 @@ export function Library() {
                               Vehicle Browser
                             </Button>
                             )}
+                            */
                           </div>
                         ) : (
                           /* Needs update */
@@ -985,11 +989,13 @@ export function Library() {
                               <Save className="w-4 h-4 mr-1" /> Saves
                             </Button>
                           )}
+                          {/* Vehicles button hidden for now
                           {selectedGame.recompName === 'renut' && (
                             <Button className="text-white px-4 py-2 text-sm" style={{ backgroundColor: 'var(--theme-accent)' }} onClick={() => navigate(`/${selectedGame.recompName}/vehicles`)}>
                               <Car className="w-4 h-4 mr-1" /> Vehicles
                             </Button>
                           )}
+                          */}
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">

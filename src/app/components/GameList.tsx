@@ -7,19 +7,21 @@ import type { GameRatingInfo } from '../data/useRatings';
 
 const statusColors: Record<Game['status'], string> = {
   Ingame: 'bg-red-500 text-white',
-  Stable: 'bg-green-500 text-white',
   Playable: 'bg-white text-black',
+  Stable: 'bg-green-500 text-white',
   Enhanced: 'bg-blue-500 text-white',
+  External: 'bg-purple-500 text-white',
 };
 
 const statusDescriptions: Record<Game['status'], string> = {
-  Enhanced: '100% playable with no crashes and includes mods',
-  Stable: '100% playable with no crashes',
-  Playable: 'Very little crashes',
-  Ingame: 'Very little crashes but has graphics issues',
+  Ingame: 'Gets in-game but has major issues',
+  Playable: 'Completable with minor issues',
+  Stable: 'Fully playable, no notable issues',
+  Enhanced: 'Stable + mod/quality-of-life improvements',
+  External: 'Playable via an external launcher or service',
 };
 
-const ALL_STATUSES: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame'];
+const ALL_STATUSES: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame', 'External'];
 const ALL_PLATFORMS: Platform[] = ['Windows', 'Linux', 'Mac'];
 
 const PlatformIcon = ({ platform, className }: { platform: Platform; className?: string }) => {
