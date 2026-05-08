@@ -28,7 +28,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/toolti
 import { BackgroundAudioPlayer } from '../components/BackgroundAudioPlayer';
 import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
-import { buildReleaseDownloadPrefix, readInstalledInfo, useGameReleases, type InstalledInfo } from '../data/useGameReleases';
+import { buildReleaseDownloadPrefix, pickDefaultAsset, readInstalledInfo, useGameReleases, type InstalledInfo } from '../data/useGameReleases';
 import { GameVersionPicker } from '../components/GameVersionPicker';
 
 const statusColors: Record<Game['status'], string> = {
@@ -193,6 +193,7 @@ export function Library() {
   const releasesState = useGameReleases(selectedGame);
   const {
     repo: githubRepo,
+    releases: allReleases,
     visibleReleases,
     showNightlies,
     setShowNightlies,
@@ -227,20 +228,58 @@ export function Library() {
     return false;
   }, [installedInfo, selectedTag, selectedAsset]);
 
+  // Detect when a newer release is available than what is currently installed,
+  // as long as the user has not explicitly pinned to a different (older) version.
+  // Respects the installed channel: a nightly install only upgrades to a newer
+  // nightly; a stable install only upgrades to a newer stable release.
+  const newerReleaseAvailable = useMemo(() => {
+    if (!installedInfo?.version) return false;
+    // If the user has explicitly pinned to a different version than installed,
+    // selectionMismatch already handles showing the update button.
+    if (selectedTag && installedInfo.version !== selectedTag) return false;
+    const installedIsNightly = allReleases.find(r => r.tag === installedInfo.version)?.prerelease ?? false;
+    const candidates = allReleases.filter(r => r.prerelease === installedIsNightly);
+    const latestTag = candidates[0]?.tag;
+    return !!latestTag && latestTag !== installedInfo.version;
+  }, [installedInfo, selectedTag, allReleases]);
+
+  // When a newer version is available (and the user hasn't pinned to a different
+  // version), resolve update targets to the correct channel; otherwise fall back
+  // to whatever the user has currently selected.
+  const updateInfo = useMemo(() => {
+    if (newerReleaseAvailable && githubRepo && selectedGame) {
+      const installedIsNightly = allReleases.find(r => r.tag === installedInfo?.version)?.prerelease ?? false;
+      const target = allReleases.filter(r => r.prerelease === installedIsNightly)[0];
+      if (target) {
+        return {
+          tag: target.tag,
+          prefix: buildReleaseDownloadPrefix(githubRepo, target.tag),
+          asset: pickDefaultAsset(selectedGame, target.assets) ?? selectedAsset,
+        };
+      }
+    }
+    return { tag: selectedTag, prefix: releaseDownloadPrefix, asset: selectedAsset };
+  }, [newerReleaseAvailable, githubRepo, allReleases, installedInfo, selectedGame, selectedTag, releaseDownloadPrefix, selectedAsset]);
+
   const triggerUpdate = useCallback(() => {
     if (!selectedGame) return;
     const w = window as any;
     if (typeof w.Update !== 'function') return;
     w.Update(
       selectedGame.recompName,
-      releaseDownloadPrefix,
-      selectedAsset ?? '',
-      selectedTag ?? '',
+      updateInfo.prefix ?? '',
+      updateInfo.asset ?? '',
+      updateInfo.tag ?? '',
     );
+    // If we advanced to a newer release, persist the new tag so that
+    // selectionMismatch doesn't immediately fire again after install.
+    if (newerReleaseAvailable && updateInfo.tag) {
+      setSelectedTag(updateInfo.tag);
+    }
     setUpdating(true);
     setDownloadProgress(0);
     setDownloadString('');
-  }, [selectedGame, releaseDownloadPrefix, selectedAsset, selectedTag]);
+  }, [selectedGame, updateInfo, newerReleaseAvailable, setSelectedTag]);
 
   // Normalize headerImage to an array
   const headerImages = useMemo(() => {
@@ -652,7 +691,7 @@ export function Library() {
                               <Play className="w-5 h-5 mr-2" />
                               Play
                             </Button>
-                            {(needsUpdate || selectionMismatch) && (
+                            {(needsUpdate || selectionMismatch || newerReleaseAvailable) && (
                               <Button
                                 className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
                                 onClick={triggerUpdate}
@@ -927,7 +966,7 @@ export function Library() {
                           <Button className="bg-[#5c7e10] hover:bg-[#78a00f] text-white px-4 py-2 text-sm" onClick={() => { setAudioMuted(true); (window as any).Play(selectedGame.recompName, buildCvarArgs()); }}>
                             <Play className="w-4 h-4 mr-1" /> Play
                           </Button>
-                          {(needsUpdate || selectionMismatch) && (
+                          {(needsUpdate || selectionMismatch || newerReleaseAvailable) && (
                             <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
                               <Download className="w-4 h-4 mr-1" /> Update
                             </Button>
