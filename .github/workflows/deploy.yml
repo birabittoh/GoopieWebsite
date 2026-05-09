@@ -51,3 +51,13 @@ jobs:
           source: "dist/*"
           target: "${{ secrets.DEPLOY_PATH }}"
           strip_components: 1
+
+      - name: Fix permissions
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            find ${{ secrets.DEPLOY_PATH }} -type d -exec chmod 755 {} \;
+            find ${{ secrets.DEPLOY_PATH }} -type f -exec chmod 644 {} \;
