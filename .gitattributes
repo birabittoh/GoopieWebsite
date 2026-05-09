@@ -3,3 +3,4 @@
 
 # Large binary files tracked with Git LFS
 *.exe filter=lfs diff=lfs merge=lfs -text
+*.msi filter=lfs diff=lfs merge=lfs -text
