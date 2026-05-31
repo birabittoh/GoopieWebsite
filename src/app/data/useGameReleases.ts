@@ -123,6 +123,36 @@ export function sortAssetsByRelevance(assets: ReleaseAsset[], platform?: string,
 }
 
 /**
+ * Parse a version tag into a numeric tuple for comparison.
+ * Strips common prefixes ("v", "V") and suffix labels ("-alpha", "-rc1", etc.).
+ * Returns [major, minor, patch] as numbers, defaulting to 0 for missing parts.
+ */
+function parseVersion(tag: string): [number, number, number] {
+  const clean = tag.replace(/^[vV]/, '').split(/[-+]/)[0];
+  const parts = clean.split('.').map(p => parseInt(p, 10) || 0);
+  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+}
+
+/**
+ * Compare two release tags newest-first (descending).
+ * Falls back to publishedAt when the parsed versions are equal.
+ */
+export function compareReleasesNewestFirst(
+  a: Pick<GameRelease, 'tag' | 'publishedAt'>,
+  b: Pick<GameRelease, 'tag' | 'publishedAt'>,
+): number {
+  const [aMaj, aMin, aPat] = parseVersion(a.tag);
+  const [bMaj, bMin, bPat] = parseVersion(b.tag);
+  if (bMaj !== aMaj) return bMaj - aMaj;
+  if (bMin !== aMin) return bMin - aMin;
+  if (bPat !== aPat) return bPat - aPat;
+  // Versions identical — fall back to publish timestamp.
+  const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+  const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+  return bDate - aDate;
+}
+
+/**
  * Build the canonical download URL prefix passed to the launcher's `Update`
  * function for a given release tag (the launcher appends the asset name).
  */
@@ -214,7 +244,8 @@ export function useGameReleases(game: Game | undefined) {
     let cancelled = false;
     const cached = releasesCache.get(repo);
     if (cached && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
-      setReleases(cached.releases);
+      // Re-sort in case the cached data pre-dates the semver sort.
+      setReleases([...cached.releases].sort(compareReleasesNewestFirst));
       return;
     }
     setLoading(true);
@@ -243,7 +274,8 @@ export function useGameReleases(game: Game | undefined) {
                 }))
               : [],
           }))
-          .filter(r => r.tag);
+          .filter(r => r.tag)
+          .sort(compareReleasesNewestFirst);
         releasesCache.set(repo, { fetchedAt: Date.now(), releases: list });
         setReleases(list);
       })
@@ -257,9 +289,12 @@ export function useGameReleases(game: Game | undefined) {
     return () => { cancelled = true; };
   }, [repo]);
 
-  // Visible releases according to nightly toggle.
+  // Visible releases according to nightly toggle, sorted newest-first by semver
+  // so that visibleReleases[0] is always the latest (not dependent on GitHub's
+  // API return order, which can surface re-published older releases at the top).
   const visibleReleases = useMemo(() => {
-    return showNightlies ? releases : releases.filter(r => !r.prerelease);
+    const filtered = showNightlies ? releases : releases.filter(r => !r.prerelease);
+    return [...filtered].sort(compareReleasesNewestFirst);
   }, [releases, showNightlies]);
 
   // Resolve the effective selected tag (fallback to latest visible).
