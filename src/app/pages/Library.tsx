@@ -30,7 +30,7 @@ import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
 import { buildReleaseDownloadPrefix, pickDefaultAsset, readInstalledInfo, useGameReleases, type InstalledInfo } from '../data/useGameReleases';
 import { GameVersionPicker } from '../components/GameVersionPicker';
-import { isInLauncher, openExternal as openExternalUrl } from '../utils/externalLink';
+import { isInLauncher, isInTauriLauncher, openExternal as openExternalUrl } from '../utils/externalLink';
 
 const statusColors: Record<Game['status'], string> = {
   Ingame: 'bg-red-500 text-white',
@@ -84,9 +84,12 @@ export function Library() {
   const [isCreating, setIsCreating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [headerIdx, setHeaderIdx] = useState(0);
-  // Two-slot double-buffer for the header cross-fade.  Neither slot is ever
+  // Two-slot double-buffer for the header image swap.  Neither slot is ever
   // keyed by src, so both stay mounted across game switches — the outgoing
-  // image fades out while the incoming image fades in.
+  // image stays painted while the incoming one decodes, then React flips
+  // activeSlot.  In browser/CEF the swap uses an opacity cross-fade; in the
+  // Tauri/WebKit launcher transitions are disabled (instant swap).
+  const isTauri = isInTauriLauncher();
   const [slotA, setSlotA] = useState({ src: '' });
   const [slotB, setSlotB] = useState({ src: '' });
   const [activeSlot, setActiveSlot] = useState<'A' | 'B'>('A');
@@ -584,7 +587,8 @@ export function Library() {
           <div className="flex-1 overflow-y-auto relative" >
           {selectedGame ? (
             <>
-              {/* Header Image — two persistent slots cross-fade on game/image change */}
+              {/* Header Image — two persistent slots swap on game/image change.
+                  Browser/CEF: 1 s opacity cross-fade.  Tauri: instant (no transition). */}
               <div className="relative h-[200px] md:h-[500px] overflow-hidden z-10 ">
                 {([{ id: 'A', slot: slotA }, { id: 'B', slot: slotB }] as const).map(({ id, slot }) => (
                   <img
@@ -594,7 +598,7 @@ export function Library() {
                     className="absolute inset-0 w-full h-full object-cover"
                     style={{
                       opacity: activeSlot === id ? (('var(--theme-header-alpha)' as unknown) as number) : 0,
-                      transition: 'opacity 1s ease-in-out',
+                      transition: isTauri ? undefined : 'opacity 1s ease-in-out',
                     }}
                   />
                 ))}

@@ -10,9 +10,17 @@
  *   import { isInLauncher, openExternal } from '../utils/externalLink';
  */
 
-/** Returns true when the page is running inside a launcher (Tauri or CEF). */
+/** Returns true when the page is running inside any launcher (Tauri or CEF). */
 export function isInLauncher(): boolean {
   return typeof (window as any).GetPlatform === 'function';
+}
+
+/**
+ * Returns true when running inside the new Tauri/WebKit-based GoopieLauncher.
+ * The legacy CEF launcher does not inject window.GoogleSignIn.
+ */
+export function isInTauriLauncher(): boolean {
+  return typeof (window as any).GoogleSignIn === 'function';
 }
 
 /**
