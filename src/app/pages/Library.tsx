@@ -75,7 +75,9 @@ export function Library() {
     return [];
   });
   const [audioKey, setAudioKey] = useState(0);
-  const [audioMuted, setAudioMuted] = useState(false);
+  const [audioMuted, setAudioMuted] = useState(() => {
+    try { return localStorage.getItem('goopie:audioMuted') === '1'; } catch { return false; }
+  });
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -93,7 +95,9 @@ export function Library() {
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
   const [extractString, setExtractString] = useState('');
-  const [infoBannerDismissed, setInfoBannerDismissed] = useState(false);
+  const [infoBannerDismissed, setInfoBannerDismissed] = useState(() => {
+    try { return localStorage.getItem('goopie:infoBannerDismissed') === '1'; } catch { return false; }
+  });
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [showMobileDetail, setShowMobileDetail] = useState(false);
@@ -399,6 +403,16 @@ export function Library() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [updating, extracting, selectedGame]);
+
+  // Persist audio mute preference across page loads.
+  useEffect(() => {
+    try { localStorage.setItem('goopie:audioMuted', audioMuted ? '1' : '0'); } catch { /* quota */ }
+  }, [audioMuted]);
+
+  // Persist piracy-banner dismissal across page loads.
+  useEffect(() => {
+    try { localStorage.setItem('goopie:infoBannerDismissed', infoBannerDismissed ? '1' : '0'); } catch { /* quota */ }
+  }, [infoBannerDismissed]);
 
   const handleSelectGame = useCallback((id: string) => {
     setSelectedGameId(id);
