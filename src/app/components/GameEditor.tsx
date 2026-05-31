@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Game, Platform, CVar, CVarType } from '../types/game';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -292,15 +293,15 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className={labelClass} style={labelStyle}>Description *</label>
-              <a
-                href="/markdown-reference"
+              <Link
+                to="/markdown-reference"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs hover:underline"
                 style={{ color: 'var(--theme-accent)' }}
               >
                 Markdown reference ↗
-              </a>
+              </Link>
             </div>
             <textarea
               value={form.description}

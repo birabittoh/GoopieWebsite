@@ -1300,9 +1300,9 @@ export function Library() {
             <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--theme-border)' }}>
               <h2 className="text-xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>Edit Description</h2>
               <div className="flex items-center gap-2">
-                <a href="/markdown-reference" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--theme-accent)' }}>
+                <Link to="/markdown-reference" target="_blank" rel="noopener noreferrer" className="text-xs hover:underline" style={{ color: 'var(--theme-accent)' }}>
                   Markdown reference ↗
-                </a>
+                </Link>
                 <button onClick={() => setEditingDescription(false)} style={{ color: 'var(--theme-text-muted)' }}>
                   <X className="w-5 h-5" />
                 </button>
