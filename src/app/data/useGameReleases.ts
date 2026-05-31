@@ -279,11 +279,27 @@ export function useGameReleases(game: Game | undefined) {
   );
 
   // Resolve the effective selected asset.
+  // When a platform is known (i.e. we're inside the launcher), skip the legacy
+  // pickDefaultAsset() Windows-first logic and default to the top of the
+  // already platform-sorted sortedAssets list instead.  A game-specific
+  // preferredAssetSuffix still takes precedence when set.  When running in a
+  // plain browser (platform undefined), the legacy path is preserved so existing
+  // behaviour for web users is unchanged.
   const effectiveAsset = useMemo(() => {
     if (!selectedRelease || !game) return undefined;
     if (selectedAsset && selectedRelease.assets.some(a => a.name === selectedAsset)) return selectedAsset;
+    // Honour the explicit per-game preferred suffix first (works for any platform).
+    if (game.preferredAssetSuffix) {
+      const preferred = `${game.recompName}${game.preferredAssetSuffix}`;
+      const hit = sortedAssets.find(a => a.name.toLowerCase() === preferred.toLowerCase());
+      if (hit) return hit.name;
+    }
+    // When the launcher provides a platform, trust the already-sorted list.
+    if (platform && sortedAssets.length > 0) return sortedAssets[0].name;
+    // Browser / unknown platform: fall back to the legacy helper so the existing
+    // behaviour (prefer .exe on Windows, first asset otherwise) is preserved.
     return pickDefaultAsset(game, sortedAssets);
-  }, [selectedRelease, selectedAsset, game, sortedAssets]);
+  }, [selectedRelease, selectedAsset, game, sortedAssets, platform]);
 
   const setSelectedTag = useCallback((tag: string | undefined) => {
     setSelectedTagState(tag);
@@ -309,6 +325,8 @@ export function useGameReleases(game: Game | undefined) {
     sortedAssets,
     setSelectedTag,
     setSelectedAsset,
+    platform,
+    arch,
   };
 }
 

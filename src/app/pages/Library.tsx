@@ -28,7 +28,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/toolti
 import { BackgroundAudioPlayer } from '../components/BackgroundAudioPlayer';
 import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
-import { buildReleaseDownloadPrefix, pickDefaultAsset, readInstalledInfo, useGameReleases, type InstalledInfo } from '../data/useGameReleases';
+import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, readInstalledInfo, useGameReleases, type InstalledInfo } from '../data/useGameReleases';
 import { GameVersionPicker } from '../components/GameVersionPicker';
 import { isInLauncher, isInTauriLauncher, openExternal as openExternalUrl } from '../utils/externalLink';
 
@@ -226,6 +226,8 @@ export function Library() {
     setSelectedAsset,
     loading: releasesLoading,
     error: releasesError,
+    platform: launcherPlatform,
+    arch: launcherArch,
   } = releasesState;
   const [installedInfo, setInstalledInfo] = useState<InstalledInfo | null>(null);
 
@@ -274,15 +276,28 @@ export function Library() {
       const installedIsNightly = allReleases.find(r => r.tag === installedInfo?.version)?.prerelease ?? false;
       const target = allReleases.filter(r => r.prerelease === installedIsNightly)[0];
       if (target) {
+        const targetSorted = sortAssetsByRelevance(target.assets, launcherPlatform, launcherArch);
+        // Mirror the platform-aware logic in effectiveAsset: prefer the game's
+        // explicit suffix, then the top of the platform-sorted list when the
+        // platform is known, then fall back to the legacy helper.
+        let asset: string | undefined;
+        if (selectedGame.preferredAssetSuffix) {
+          const preferred = `${selectedGame.recompName}${selectedGame.preferredAssetSuffix}`;
+          asset = targetSorted.find(a => a.name.toLowerCase() === preferred.toLowerCase())?.name;
+        }
+        if (!asset && launcherPlatform && targetSorted.length > 0) {
+          asset = targetSorted[0].name;
+        }
+        if (!asset) asset = pickDefaultAsset(selectedGame, targetSorted);
         return {
           tag: target.tag,
           prefix: buildReleaseDownloadPrefix(githubRepo, target.tag),
-          asset: pickDefaultAsset(selectedGame, target.assets) ?? selectedAsset,
+          asset: asset ?? selectedAsset,
         };
       }
     }
     return { tag: selectedTag, prefix: releaseDownloadPrefix, asset: selectedAsset };
-  }, [newerReleaseAvailable, githubRepo, allReleases, installedInfo, selectedGame, selectedTag, releaseDownloadPrefix, selectedAsset]);
+  }, [newerReleaseAvailable, githubRepo, allReleases, installedInfo, selectedGame, selectedTag, releaseDownloadPrefix, selectedAsset, launcherPlatform, launcherArch]);
 
   const triggerUpdate = useCallback(() => {
     if (!selectedGame) return;
