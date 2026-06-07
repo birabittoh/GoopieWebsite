@@ -1,6 +1,53 @@
-import { Search, Settings, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, Settings, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
 import { Link } from 'react-router';
 import { Input } from './ui/input';
+import { isInTauriLauncher } from '../utils/externalLink';
+
+/**
+ * Online/offline mode toggle — only rendered inside the Tauri launcher (it
+ * relies on the `isOfflineMode`/`setOfflineMode` bridge functions, which the
+ * legacy CEF launcher and the plain web build don't inject).
+ *
+ * The choice is persisted natively (see GoopieLauncher's offline-mode
+ * preference) and survives restarts; toggling navigates the window
+ * immediately, so no extra client-side state plumbing is needed.
+ */
+function OfflineModeToggle() {
+  const [offline, setOffline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const w = window as any;
+    if (typeof w.isOfflineMode === 'function') {
+      setOffline(Boolean(w.isOfflineMode()));
+    }
+  }, []);
+
+  if (offline === null) return null;
+
+  const handleClick = () => {
+    const w = window as any;
+    if (typeof w.setOfflineMode === 'function') {
+      w.setOfflineMode(!offline);
+      setOffline(!offline);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors"
+      style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-text-primary)' }}
+      title={
+        offline
+          ? 'Enable online mode to download more games and log your progress'
+          : 'Switch to offline mode'
+      }
+    >
+      {offline ? <WifiOff className="w-5 h-5" /> : <Wifi className="w-5 h-5" />}
+    </button>
+  );
+}
 
 interface TopBarProps {
   searchQuery: string;
@@ -44,6 +91,8 @@ export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, 
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 md:gap-3">
+        {isInTauriLauncher() && <OfflineModeToggle />}
+
         {onToggleMute && (
           <button
             onClick={onToggleMute}

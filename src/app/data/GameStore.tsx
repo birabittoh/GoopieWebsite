@@ -11,6 +11,27 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Game } from '../types/game';
 import { games as defaultGames } from '../data/games';
+import { isInTauriLauncher } from '../utils/externalLink';
+
+/**
+ * Disk-based cache of the games catalogue, written through the native bridge
+ * (see GoopieLauncher's getCachedGamesData/setCachedGamesData) on every
+ * successful Firestore fetch. It's the offline fallback: the embedded offline
+ * site is served from a different origin than goopie.xyz, so it can't share
+ * localStorage with the live site — but both share the injected bridge.
+ */
+function readGamesCache(): Game[] | null {
+  const w = window as any;
+  if (typeof w.getCachedGamesData !== 'function') return null;
+  const cached = w.getCachedGamesData();
+  return cached && Array.isArray(cached.games) ? (cached.games as Game[]) : null;
+}
+
+function writeGamesCache(games: Game[]): void {
+  const w = window as any;
+  if (typeof w.setCachedGamesData !== 'function') return;
+  w.setCachedGamesData({ lastUpdated: new Date().toISOString(), games });
+}
 
 interface GameStoreContextType {
   games: Game[];
@@ -35,8 +56,15 @@ export function GameStoreProvider({ children }: { children: ReactNode }) {
       const games = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Game));
       setFirestoreGames(games);
       setLoaded(true);
+      if (isInTauriLauncher()) writeGamesCache(games);
     }, () => {
-      // On error (e.g. no Firebase config yet), fall back to defaults
+      // Firestore unreachable (e.g. offline, or no Firebase config yet).
+      // In the launcher, fall back to the last cache written on a successful
+      // fetch; otherwise fall back to the bundled defaults.
+      if (isInTauriLauncher()) {
+        const cached = readGamesCache();
+        if (cached) setFirestoreGames(cached);
+      }
       setLoaded(true);
     });
     return unsub;
