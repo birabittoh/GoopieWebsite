@@ -131,5 +131,16 @@ service cloud.firestore {
     match /userFavorites/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Per-user playtime — doc ID is the owner's UID, written by the launcher
+    // as `{ uid, games: { [gameId]: { totalSeconds, lastPlayedAt } } }`.
+    // Always owner-writable; the `public` flag is reserved for a future
+    // "share my playtime" toggle (not yet built) — owners can read regardless,
+    // and a doc only becomes publicly readable once it explicitly opts in.
+    match /playtime/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid)
+        || resource.data.get('public', false) == true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
