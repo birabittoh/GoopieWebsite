@@ -23,14 +23,42 @@ export interface InstalledInfo {
 
 const NIGHTLY_KEY = 'goopie:showNightlies';
 const SELECTION_KEY = (gameId: string) => `goopie:gameVersion:${gameId}`;
+const RELEASES_STORAGE_KEY = (repo: string) => `goopie:releases:${repo}`;
 const RELEASES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CachedReleases {
   fetchedAt: number;
   releases: GameRelease[];
+  /** True when this entry was served as a fallback after a failed fetch. */
+  stale: boolean;
 }
 
 const releasesCache = new Map<string, CachedReleases>();
+
+/**
+ * Persistent (localStorage) copy of the releases cache, keyed per repo. This
+ * survives page reloads, so a GitHub rate-limit (403) on a fresh load can
+ * still show the last known-good releases instead of an empty list.
+ */
+function loadPersistedReleases(repo: string): CachedReleases | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(RELEASES_STORAGE_KEY(repo));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.releases) || typeof parsed.fetchedAt !== 'number') return null;
+    return { fetchedAt: parsed.fetchedAt, releases: parsed.releases, stale: !!parsed.stale };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedReleases(repo: string, entry: CachedReleases) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(RELEASES_STORAGE_KEY(repo), JSON.stringify(entry));
+  } catch { /* ignore quota errors */ }
+}
 
 /**
  * Derive `owner/repo` from any of the github fields on a Game.
@@ -209,6 +237,8 @@ export function useGameReleases(game: Game | undefined) {
   const [releases, setReleases] = useState<GameRelease[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [releasesStale, setReleasesStale] = useState(false);
+  const [releasesUpdatedAt, setReleasesUpdatedAt] = useState<number | undefined>(undefined);
   const [showNightlies, setShowNightliesState] = useState<boolean>(() => getShowNightlies());
 
   const setShowNightlies = useCallback((v: boolean) => {
@@ -239,15 +269,31 @@ export function useGameReleases(game: Game | undefined) {
   useEffect(() => {
     if (!repo) {
       setReleases([]);
+      setReleasesStale(false);
+      setReleasesUpdatedAt(undefined);
       return;
     }
     let cancelled = false;
+
+    const useEntry = (entry: CachedReleases) => {
+      const sorted = [...entry.releases].sort(compareReleasesNewestFirst);
+      setReleases(sorted);
+      setReleasesStale(entry.stale);
+      setReleasesUpdatedAt(entry.fetchedAt);
+    };
+
+    // In-memory cache (resets on reload) takes priority when fresh and not stale.
     const cached = releasesCache.get(repo);
-    if (cached && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
-      // Re-sort in case the cached data pre-dates the semver sort.
-      setReleases([...cached.releases].sort(compareReleasesNewestFirst));
+    if (cached && !cached.stale && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
+      useEntry(cached);
       return;
     }
+
+    // Seed from the persisted (localStorage) cache so a reloaded page has
+    // something to show immediately while we refetch in the background.
+    const persisted = cached ?? loadPersistedReleases(repo);
+    if (persisted) useEntry(persisted);
+
     setLoading(true);
     setError(null);
     fetch(`https://api.github.com/repos/${repo}/releases?per_page=50`, {
@@ -276,12 +322,25 @@ export function useGameReleases(game: Game | undefined) {
           }))
           .filter(r => r.tag)
           .sort(compareReleasesNewestFirst);
-        releasesCache.set(repo, { fetchedAt: Date.now(), releases: list });
+        const entry: CachedReleases = { fetchedAt: Date.now(), releases: list, stale: false };
+        releasesCache.set(repo, entry);
+        savePersistedReleases(repo, entry);
         setReleases(list);
+        setReleasesStale(false);
+        setReleasesUpdatedAt(entry.fetchedAt);
       })
       .catch(e => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : String(e));
+        // GitHub errored (e.g. 403 rate-limit) — fall back to the last known-good
+        // releases (in-memory or persisted) instead of leaving the list empty.
+        const fallback = cached ?? loadPersistedReleases(repo);
+        if (fallback) {
+          const staleEntry: CachedReleases = { ...fallback, stale: true };
+          releasesCache.set(repo, staleEntry);
+          useEntry(staleEntry);
+        } else {
+          setError(e instanceof Error ? e.message : String(e));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -350,6 +409,8 @@ export function useGameReleases(game: Game | undefined) {
     repo,
     loading,
     error,
+    releasesStale,
+    releasesUpdatedAt,
     releases,
     visibleReleases,
     showNightlies,

@@ -18,6 +18,10 @@ interface Props {
   installed: InstalledInfo | null;
   loading: boolean;
   error: string | null;
+  /** True when `visibleReleases` is being served from a cached fallback after a fetch error. */
+  stale?: boolean;
+  /** Timestamp (ms) of when the currently-shown release data was fetched. */
+  updatedAt?: number;
   /** Use the smaller (mobile) trigger styling. */
   compact?: boolean;
 }
@@ -45,6 +49,8 @@ export function GameVersionPicker({
   installed,
   loading,
   error,
+  stale,
+  updatedAt,
   compact,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -125,6 +131,11 @@ export function GameVersionPicker({
         )}
         {error && !loading && (
           <div className="text-xs text-red-400">Failed to load releases: {error}</div>
+        )}
+        {stale && !loading && (
+          <div className="text-xs text-amber-400">
+            Showing cached data from {updatedAt ? new Date(updatedAt).toLocaleString() : 'earlier'} — GitHub may be rate-limiting requests.
+          </div>
         )}
 
         {!loading && !error && visibleReleases.length === 0 && (

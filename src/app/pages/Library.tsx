@@ -226,6 +226,8 @@ export function Library() {
     setSelectedAsset,
     loading: releasesLoading,
     error: releasesError,
+    releasesStale,
+    releasesUpdatedAt,
     platform: launcherPlatform,
     arch: launcherArch,
   } = releasesState;
@@ -867,6 +869,8 @@ export function Library() {
                             installed={installedInfo}
                             loading={releasesLoading}
                             error={releasesError}
+                            stale={releasesStale}
+                            updatedAt={releasesUpdatedAt}
                           />
                         </div>
                       )}
@@ -1136,6 +1140,8 @@ export function Library() {
                           installed={installedInfo}
                           loading={releasesLoading}
                           error={releasesError}
+                          stale={releasesStale}
+                          updatedAt={releasesUpdatedAt}
                         />
                       </div>
                     )}
