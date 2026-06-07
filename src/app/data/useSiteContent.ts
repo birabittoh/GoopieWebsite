@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../auth/AuthContext';
+import { isOfflineMode } from '../utils/externalLink';
 
 export type SiteContentKey = 'homeTagline' | 'footerCopyright' | 'eula' | 'privacy';
 
@@ -19,6 +20,14 @@ export function useSiteContent<T extends Record<string, any>>(
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // No disk cache for site content — explicit offline mode just means "use
+    // the bundled defaults", and skipping the subscription avoids spamming
+    // the console with `firestore.googleapis.com` connection-error retries.
+    if (isOfflineMode()) {
+      setValue(defaultValue);
+      setLoaded(true);
+      return;
+    }
     const ref = doc(db, 'siteContent', key);
     const unsub = onSnapshot(
       ref,
