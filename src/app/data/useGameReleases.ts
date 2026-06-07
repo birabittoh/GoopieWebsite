@@ -469,8 +469,10 @@ export function readInstalledInfo(recompName: string): InstalledInfo | null {
 /**
  * List every build of a game that is currently installed on disk (each living
  * in its own `builds/<tag>/` directory — see `getInstalledBuilds` in the
- * launcher's `games.rs`). Returns `[]` when not running inside the launcher,
- * when the bridge doesn't expose the call yet (older launcher), or on error.
+ * launcher's `games.rs`), sorted newest-first by semver (falling back to the
+ * on-disk build key when a build has no recorded version). Returns `[]` when
+ * not running inside the launcher, when the bridge doesn't expose the call yet
+ * (older launcher), or on error.
  */
 export function readInstalledBuilds(recompName: string): InstalledBuild[] {
   if (typeof window === 'undefined') return [];
@@ -480,7 +482,12 @@ export function readInstalledBuilds(recompName: string): InstalledBuild[] {
     const raw = w.getInstalledBuilds(recompName);
     if (!raw) return [];
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) ? (parsed as InstalledBuild[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    const builds = parsed as InstalledBuild[];
+    return [...builds].sort((a, b) => compareReleasesNewestFirst(
+      { tag: a.version || a.name },
+      { tag: b.version || b.name },
+    ));
   } catch {
     return [];
   }
