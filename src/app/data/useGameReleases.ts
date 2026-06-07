@@ -489,14 +489,23 @@ export function readInstalledBuilds(recompName: string): InstalledBuild[] {
 /**
  * Find the installed build matching a given version tag / asset selection
  * (the same predicate used to decide whether the user's current
- * version-picker selection is already installed). A `null`/`undefined`
- * `tag`/`asset` matches any build, so this also doubles as "pick any
- * installed build" when the caller has no explicit selection yet.
+ * version-picker selection is already installed).
+ *
+ * A side only counts as a *mismatch* when both the selection and the build
+ * report a value and they differ -- mirroring the old single-record
+ * `selectionMismatch` check. Sidecars that don't track `asset` (older/migrated
+ * installs) would otherwise never match the current selection, permanently
+ * showing "Update"/"Install" for a build that's already current. `null`/
+ * `undefined` `tag`/`asset` likewise matches anything, so this also doubles as
+ * "pick any installed build" when the caller has no explicit selection yet.
  */
 export function findInstalledBuild(
   builds: InstalledBuild[],
   tag: string | null | undefined,
   asset: string | null | undefined,
 ): InstalledBuild | null {
-  return builds.find(b => (!tag || b.version === tag) && (!asset || b.asset === asset)) ?? null;
+  return builds.find(b =>
+    !(tag && b.version && b.version !== tag) &&
+    !(asset && b.asset && b.asset !== asset)
+  ) ?? null;
 }
