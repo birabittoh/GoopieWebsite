@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useGameStore } from '../data/GameStore';
 import { useFavorites } from '../data/useFavorites';
 import { useNews } from '../data/useNews';
+import { isOfflineMode } from '../utils/externalLink';
 import type { Game } from '../types/game';
 
 interface SidebarItem {
@@ -116,33 +117,56 @@ export function Sidebar() {
       }}
     >
       {/* Profile — very top */}
-      <NavLink
-        to="/profile"
-        title={user?.username || 'Profile'}
-        aria-label={user?.username || 'Profile'}
-        className={navItemBaseClass}
-        style={({ isActive }) => ({
-          backgroundColor: isActive ? 'var(--theme-item-selected)' : 'transparent',
-        })}
-      >
-        <span
-          className="flex items-center justify-center w-9 h-9 rounded-full overflow-hidden text-white font-bold text-sm"
-          style={!user?.picture ? {
-            background: `linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))`,
-          } : undefined}
-        >
-          {user?.picture ? (
-            <img
-              src={user.picture}
-              alt={user.username}
-              className="w-9 h-9 rounded-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            user?.username?.[0]?.toUpperCase() || '?'
-          )}
-        </span>
-      </NavLink>
+      {(() => {
+        const avatar = (
+          <span
+            className="flex items-center justify-center w-9 h-9 rounded-full overflow-hidden text-white font-bold text-sm"
+            style={!user?.picture ? {
+              background: `linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))`,
+            } : undefined}
+          >
+            {user?.picture ? (
+              <img
+                src={user.picture}
+                alt={user.username}
+                className="w-9 h-9 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              user?.username?.[0]?.toUpperCase() || '?'
+            )}
+          </span>
+        );
+
+        // Sign-in requires Firestore/Firebase Auth, neither of which is
+        // reachable in offline mode — link to /profile would just dead-end
+        // on a broken sign-in page, so render it as a disabled placeholder.
+        if (isOfflineMode()) {
+          return (
+            <div
+              title="Sign-in isn't available in offline mode"
+              aria-label="Sign-in isn't available in offline mode"
+              className={`${navItemBaseClass} opacity-40 cursor-not-allowed`}
+            >
+              {avatar}
+            </div>
+          );
+        }
+
+        return (
+          <NavLink
+            to="/profile"
+            title={user?.username || 'Profile'}
+            aria-label={user?.username || 'Profile'}
+            className={navItemBaseClass}
+            style={({ isActive }) => ({
+              backgroundColor: isActive ? 'var(--theme-item-selected)' : 'transparent',
+            })}
+          >
+            {avatar}
+          </NavLink>
+        );
+      })()}
 
       <div
         className="my-2 h-px w-8"
