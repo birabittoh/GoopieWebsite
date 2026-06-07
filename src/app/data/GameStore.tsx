@@ -11,7 +11,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { Game } from '../types/game';
 import { games as defaultGames } from '../data/games';
-import { isInTauriLauncher } from '../utils/externalLink';
+import { isInTauriLauncher, isOfflineMode } from '../utils/externalLink';
 
 /**
  * Disk-based cache of the games catalogue, written through the native bridge
@@ -46,12 +46,31 @@ const GameStoreContext = createContext<GameStoreContextType | null>(null);
 
 const GAMES_COLLECTION = 'games';
 
-export function GameStoreProvider({ children }: { children: ReactNode }) {
-  const [firestoreGames, setFirestoreGames] = useState<Game[]>([]);
-  const [loaded, setLoaded] = useState(false);
+/**
+ * The disk cache as of mount, read once up front so the very first render
+ * already has data to show. Without this, a fresh page load (e.g. navigating
+ * into the embedded offline bundle) starts with `firestoreGames = []` and
+ * `loaded = false` — and if Firestore's `onSnapshot` never settles (no
+ * network, no local IndexedDB persistence configured, so it just queues
+ * silently instead of calling the error callback), the library stays on
+ * `defaultGames`, which is an empty array, i.e. "all games disappeared".
+ */
+function initialCachedGames(): Game[] | null {
+  return isInTauriLauncher() ? readGamesCache() : null;
+}
 
-  // Listen to Firestore games collection in real-time
+export function GameStoreProvider({ children }: { children: ReactNode }) {
+  const [firestoreGames, setFirestoreGames] = useState<Game[]>(() => initialCachedGames() ?? []);
+  const [loaded, setLoaded] = useState(() => initialCachedGames() !== null);
+
+  // Listen to Firestore games collection in real-time. Skipped entirely in
+  // explicit offline mode — the SDK has no way to know in advance that the
+  // listener will never connect, so it just queues silently (no error
+  // callback, console spam from repeated `firestore.googleapis.com`
+  // resolution failures) and would otherwise race with / clobber the
+  // cache-seeded initial state above once it eventually does connect.
   useEffect(() => {
+    if (isOfflineMode()) return;
     const unsub = onSnapshot(collection(db, GAMES_COLLECTION), (snapshot) => {
       const games = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Game));
       setFirestoreGames(games);

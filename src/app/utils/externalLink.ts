@@ -24,6 +24,19 @@ export function isInTauriLauncher(): boolean {
 }
 
 /**
+ * Returns true when the user has explicitly enabled offline mode in the
+ * Tauri launcher (see `window.isOfflineMode` / GoopieLauncher's persisted
+ * preference). Firestore-backed hooks should treat this as "don't even try
+ * to subscribe" — not just "the network is currently down" — so the app
+ * stops generating `firestore.googleapis.com` connection-error spam and the
+ * disk-cache-seeded state isn't raced/overwritten by a live listener.
+ */
+export function isOfflineMode(): boolean {
+  const w = window as any;
+  return isInTauriLauncher() && typeof w.isOfflineMode === 'function' && Boolean(w.isOfflineMode());
+}
+
+/**
  * Open `url` in the system browser when inside a launcher, otherwise open a
  * new tab.  Safe to call from any component without a React hook.
  */
