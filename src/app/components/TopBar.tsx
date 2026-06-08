@@ -1,73 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Search, Settings, Volume2, VolumeX, Wifi, WifiOff } from 'lucide-react';
+import { Search, Settings, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'react-router';
 import { Input } from './ui/input';
 import { isInTauriLauncher } from '../utils/externalLink';
-
-/**
- * Online/offline mode toggle — only rendered inside the Tauri launcher (it
- * relies on the `isOfflineMode`/`setOfflineMode` bridge functions, which the
- * legacy CEF launcher and the plain web build don't inject).
- *
- * The choice is persisted natively (see GoopieLauncher's offline-mode
- * preference) and survives restarts; toggling navigates the window
- * immediately, so no extra client-side state plumbing is needed.
- */
-function OfflineModeToggle() {
-  const [offline, setOffline] = useState<boolean | null>(null);
-  const [reachable, setReachable] = useState(true);
-
-  useEffect(() => {
-    const w = window as any;
-    if (typeof w.isOfflineMode === 'function') {
-      setOffline(Boolean(w.isOfflineMode()));
-    }
-  }, []);
-
-  // goopie.xyz reachability is cached natively (a real probe can take seconds
-  // to time out, and the bridge is synchronous) — poll the cheap cached flag
-  // so "switch to online mode" can be greyed out while it'd just land on a
-  // broken page.
-  useEffect(() => {
-    const w = window as any;
-    if (typeof w.isGoopieReachable !== 'function') return;
-    const poll = () => setReachable(Boolean(w.isGoopieReachable()));
-    poll();
-    const interval = setInterval(poll, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  if (offline === null) return null;
-
-  const disabled = offline && !reachable;
-
-  const handleClick = () => {
-    if (disabled) return;
-    const w = window as any;
-    if (typeof w.setOfflineMode === 'function') {
-      w.setOfflineMode(!offline);
-      setOffline(!offline);
-    }
-  };
-
-  const title = disabled
-    ? "goopie.xyz isn't reachable right now — can't switch to online mode"
-    : offline
-      ? 'Enable online mode to download more games and log your progress'
-      : 'Switch to offline mode';
-
-  return (
-    <button
-      onClick={handleClick}
-      disabled={disabled}
-      className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-      style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-text-primary)' }}
-      title={title}
-    >
-      {offline ? <WifiOff className="w-5 h-5" /> : <Wifi className="w-5 h-5" />}
-    </button>
-  );
-}
 
 interface TopBarProps {
   searchQuery: string;
@@ -111,8 +45,6 @@ export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, 
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 md:gap-3">
-        {isInTauriLauncher() && <OfflineModeToggle />}
-
         {onToggleMute && (
           <button
             onClick={onToggleMute}
@@ -124,7 +56,7 @@ export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, 
           </button>
         )}
 
-        {isInCEF && (
+        {(isInCEF || isInTauriLauncher()) && (
           <Link
             to="/settings"
             className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors"

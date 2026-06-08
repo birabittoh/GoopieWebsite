@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Check, ArrowLeft, FolderOpen, Globe } from 'lucide-react';
+import { Check, ArrowLeft, FolderOpen, Globe, Wifi, WifiOff } from 'lucide-react';
 import { Link } from 'react-router';
 import { useTheme, type ThemeName } from '../theme/ThemeContext';
 import { getFpsEnabled, setFpsEnabled } from '../components/FpsCounter';
+import { isInTauriLauncher } from '../utils/externalLink';
 
 const languageOptions: { id: number; label: string }[] = [
   { id: 1, label: 'English' },
@@ -42,6 +43,8 @@ export function Settings() {
   const [gamesPath, setGamesPath] = useState('');
   const [userLanguage, setUserLanguage] = useState<number>(1);
   const [showFps, setShowFps] = useState<boolean>(() => getFpsEnabled());
+  const [offline, setOffline] = useState<boolean | null>(null);
+  const [reachable, setReachable] = useState(true);
   const w = window as any;
 
   useEffect(() => {
@@ -54,7 +57,32 @@ export function Settings() {
         setUserLanguage(lang);
       }
     }
+    if (typeof w.isOfflineMode === 'function') {
+      setOffline(Boolean(w.isOfflineMode()));
+    }
   }, []);
+
+  // goopie.xyz reachability is cached natively (a real probe can take seconds
+  // to time out, and the bridge is synchronous) — poll the cheap cached flag
+  // so "switch to online mode" can be greyed out while it'd just land on a
+  // broken page.
+  useEffect(() => {
+    if (typeof w.isGoopieReachable !== 'function') return;
+    const poll = () => setReachable(Boolean(w.isGoopieReachable()));
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const offlineModeDisabled = offline === true && !reachable;
+
+  const handleToggleOfflineMode = () => {
+    if (offline === null || offlineModeDisabled) return;
+    if (typeof w.setOfflineMode === 'function') {
+      w.setOfflineMode(!offline);
+      setOffline(!offline);
+    }
+  };
 
   const handleSetGamesPath = () => {
     if (w.SetGamesPath) {
@@ -251,6 +279,63 @@ export function Settings() {
             })}
           </div>
         </section>
+
+        {/* Online / Offline Mode Section — only meaningful inside the Tauri
+            launcher, which injects the isOfflineMode/setOfflineMode bridge
+            (the legacy CEF launcher and the plain web build don't). */}
+        {isInTauriLauncher() && offline !== null && (
+          <section>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Online / Offline Mode</h2>
+            <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
+              Offline mode keeps the launcher from talking to goopie.xyz at all — no news, ratings or
+              site content is fetched, and your play sessions aren't logged to your profile.
+            </p>
+
+            <div
+              className="rounded-xl border-2 p-5 flex items-center justify-between gap-4"
+              style={{
+                borderColor: 'var(--theme-border)',
+                backgroundColor: 'var(--theme-card-bg)',
+                backdropFilter: 'var(--theme-backdrop-blur)',
+                WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+              }}
+            >
+              <div className="min-w-0 flex items-center gap-3">
+                {offline ? (
+                  <WifiOff className="w-5 h-5 shrink-0" style={{ color: 'var(--theme-text-muted)' }} />
+                ) : (
+                  <Wifi className="w-5 h-5 shrink-0" style={{ color: 'var(--theme-text-muted)' }} />
+                )}
+                <div className="min-w-0">
+                  <div className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                    {offline ? 'Offline mode is on' : 'Offline mode is off'}
+                  </div>
+                  {offlineModeDisabled && (
+                    <div className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+                      goopie.xyz isn't reachable right now — can't switch to online mode.
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={offline}
+                disabled={offlineModeDisabled}
+                onClick={handleToggleOfflineMode}
+                className="shrink-0 relative inline-flex items-center h-7 w-12 rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: offline ? 'var(--theme-accent)' : 'var(--theme-item-default)',
+                  border: '1px solid var(--theme-border)',
+                }}
+              >
+                <span
+                  className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
+                  style={{ transform: offline ? 'translateX(22px)' : 'translateX(3px)' }}
+                />
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Debug Section (FPS) */}
         <section>
