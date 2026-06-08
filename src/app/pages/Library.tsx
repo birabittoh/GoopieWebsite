@@ -373,9 +373,11 @@ export function Library() {
     return !selectedBuild;
   }, [installedBuilds, selectedBuild]);
 
-  // The newest release tag in the same channel (nightly vs. stable) as the
-  // currently selected/installed build, as long as the user has not pinned to
-  // a different (older) version -- selectionMismatch handles that case.
+  // Latest release tag in the same channel as the currently selected/installed
+  // build (a nightly install only looks at other nightlies, a stable install
+  // only at other stable releases). `null` when there's no basis for
+  // comparison, or the user has explicitly pinned to a different (older)
+  // version than what's installed -- selectionMismatch handles that case.
   const latestChannelTag = useMemo(() => {
     if (!selectedBuild?.version) return null;
     if (selectedTag && selectedBuild.version !== selectedTag) return null;
@@ -384,24 +386,26 @@ export function Library() {
     return candidates[0]?.tag ?? null;
   }, [selectedBuild, selectedTag, allReleases]);
 
-  // If the latest channel release is already installed as a separate build
-  // (just not the one currently selected), switching to it is a local,
-  // instant operation -- no need to redownload anything.
+  // When a newer release exists but the user already has it installed as its
+  // own side-by-side build, there's nothing to download -- the action should
+  // just point the version picker at that build so Play targets it directly,
+  // not redownload something that's already on disk.
   const newerInstalledBuild = useMemo(() => {
     if (!latestChannelTag || latestChannelTag === selectedBuild?.version) return null;
     return installedBuilds.find(b => b.version === latestChannelTag) ?? null;
   }, [latestChannelTag, selectedBuild, installedBuilds]);
 
-  // Detect when a newer release is available than the currently selected
-  // (and installed) build. Respects the installed channel: a nightly install
-  // only upgrades to a newer nightly; a stable install only upgrades to a
-  // newer stable release. Doesn't fire when that newer build is already
-  // installed locally -- switchToInstalledBuild handles that instead.
+  // Detect when a newer release is available *and actually needs downloading*
+  // -- i.e. it isn't already sitting on disk as a separate build (that's
+  // `newerInstalledBuild`'s job, which just switches the selection instead).
   const newerReleaseAvailable = useMemo(() => {
     if (!latestChannelTag || !selectedBuild?.version) return false;
     return latestChannelTag !== selectedBuild.version && !newerInstalledBuild;
   }, [latestChannelTag, selectedBuild, newerInstalledBuild]);
 
+  // Switch the version-picker selection to an already-installed build (e.g.
+  // hopping from an older side-by-side install to the latest one) without
+  // touching the filesystem -- Play/Uninstall then retarget immediately.
   const switchToInstalledBuild = useCallback((build: InstalledBuild) => {
     setSelectedTag(build.version);
     setSelectedAsset(build.asset);
@@ -628,9 +632,10 @@ export function Library() {
     const w = window as any;
     if (typeof w.Uninstall !== 'function') return;
     w.Uninstall(selectedGame.recompName, build.name);
-    // Uninstalling the build the user is currently looking at would otherwise
-    // leave the picker pointing at a now-missing version ("Not installed"),
-    // even though another installed build is right there. Retarget to it.
+    // If the build we just removed is the one the picker is currently
+    // pointed at, retarget the selection to whatever's left (newest first) so
+    // the UI shows that build instead of "Not installed" when there's
+    // actually another side-by-side install available.
     if (selectedBuild?.name === build.name) {
       const remaining = readInstalledBuilds(selectedGame.recompName);
       const next = remaining[0] ?? null;
@@ -640,8 +645,10 @@ export function Library() {
     checkState();
   }, [selectedGame, selectedBuild, setSelectedTag, setSelectedAsset, checkState]);
 
-  // Lets the user reclaim the disk space an extracted ISO takes up once no
-  // build is installed at all (the case where "Uninstall" no longer applies).
+  // Delete the extracted ISO/asset data for the selected game (reclaiming the
+  // disk space it takes up) without touching saves or any installed builds.
+  // Only meaningful once every build has been uninstalled -- while a build is
+  // still around, removing assets out from under it would break it.
   const removeAssets = useCallback(() => {
     if (!selectedGame) return;
     const w = window as any;
@@ -1427,7 +1434,11 @@ export function Library() {
                             </Button>
                           )}
                           {newerInstalledBuild && (
-                            <Button className="text-white px-4 py-2 text-sm" style={{ backgroundColor: 'var(--theme-accent)' }} onClick={() => switchToInstalledBuild(newerInstalledBuild)}>
+                            <Button
+                              className="text-white px-4 py-2 text-sm"
+                              style={{ backgroundColor: 'var(--theme-accent)' }}
+                              onClick={() => switchToInstalledBuild(newerInstalledBuild)}
+                            >
                               <RefreshCw className="w-4 h-4 mr-1" /> Switch to {newerInstalledBuild.version || newerInstalledBuild.name}
                             </Button>
                           )}

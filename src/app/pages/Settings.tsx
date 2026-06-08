@@ -287,7 +287,7 @@ export function Settings() {
           <section>
             <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Online / Offline Mode</h2>
             <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
-              Offline mode keeps the launcher from talking to goopie.xyz at all — no news, ratings or
+              Offline mode keeps the launcher from talking to goopie.xyz at all; no news, ratings or
               site content is fetched, and your play sessions aren't logged to your profile.
             </p>
 
