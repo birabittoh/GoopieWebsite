@@ -373,21 +373,39 @@ export function Library() {
     return !selectedBuild;
   }, [installedBuilds, selectedBuild]);
 
-  // Detect when a newer release is available than the currently selected
-  // (and installed) build, as long as the user has not explicitly pinned to a
-  // different (older) version. Respects the installed channel: a nightly
-  // install only upgrades to a newer nightly; a stable install only upgrades
-  // to a newer stable release.
-  const newerReleaseAvailable = useMemo(() => {
-    if (!selectedBuild?.version) return false;
-    // If the user has explicitly pinned to a different version than installed,
-    // selectionMismatch already handles showing the install/update button.
-    if (selectedTag && selectedBuild.version !== selectedTag) return false;
+  // The newest release tag in the same channel (nightly vs. stable) as the
+  // currently selected/installed build, as long as the user has not pinned to
+  // a different (older) version -- selectionMismatch handles that case.
+  const latestChannelTag = useMemo(() => {
+    if (!selectedBuild?.version) return null;
+    if (selectedTag && selectedBuild.version !== selectedTag) return null;
     const installedIsNightly = allReleases.find(r => r.tag === selectedBuild.version)?.prerelease ?? false;
     const candidates = allReleases.filter(r => r.prerelease === installedIsNightly);
-    const latestTag = candidates[0]?.tag;
-    return !!latestTag && latestTag !== selectedBuild.version;
+    return candidates[0]?.tag ?? null;
   }, [selectedBuild, selectedTag, allReleases]);
+
+  // If the latest channel release is already installed as a separate build
+  // (just not the one currently selected), switching to it is a local,
+  // instant operation -- no need to redownload anything.
+  const newerInstalledBuild = useMemo(() => {
+    if (!latestChannelTag || latestChannelTag === selectedBuild?.version) return null;
+    return installedBuilds.find(b => b.version === latestChannelTag) ?? null;
+  }, [latestChannelTag, selectedBuild, installedBuilds]);
+
+  // Detect when a newer release is available than the currently selected
+  // (and installed) build. Respects the installed channel: a nightly install
+  // only upgrades to a newer nightly; a stable install only upgrades to a
+  // newer stable release. Doesn't fire when that newer build is already
+  // installed locally -- switchToInstalledBuild handles that instead.
+  const newerReleaseAvailable = useMemo(() => {
+    if (!latestChannelTag || !selectedBuild?.version) return false;
+    return latestChannelTag !== selectedBuild.version && !newerInstalledBuild;
+  }, [latestChannelTag, selectedBuild, newerInstalledBuild]);
+
+  const switchToInstalledBuild = useCallback((build: InstalledBuild) => {
+    setSelectedTag(build.version);
+    setSelectedAsset(build.asset);
+  }, [setSelectedTag, setSelectedAsset]);
 
   // When a newer version is available (and the user hasn't pinned to a different
   // version), resolve update targets to the correct channel; otherwise fall back
@@ -1056,6 +1074,16 @@ export function Library() {
                                 {selectedBuild ? 'Update' : 'Install'}
                               </Button>
                             )}
+                            {newerInstalledBuild && (
+                              <Button
+                                className="text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
+                                style={{ backgroundColor: 'var(--theme-accent)' }}
+                                onClick={() => switchToInstalledBuild(newerInstalledBuild)}
+                              >
+                                <RefreshCw className="w-5 h-5 mr-2" />
+                                Switch to {newerInstalledBuild.version || newerInstalledBuild.name}
+                              </Button>
+                            )}
                             {selectedBuild && (
                               <Button
                                 className="bg-[#8b1a1a] hover:bg-[#a52525] text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
@@ -1369,6 +1397,11 @@ export function Library() {
                           {(selectionMismatch || newerReleaseAvailable) && (
                             <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
                               <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
+                            </Button>
+                          )}
+                          {newerInstalledBuild && (
+                            <Button className="text-white px-4 py-2 text-sm" style={{ backgroundColor: 'var(--theme-accent)' }} onClick={() => switchToInstalledBuild(newerInstalledBuild)}>
+                              <RefreshCw className="w-4 h-4 mr-1" /> Switch to {newerInstalledBuild.version || newerInstalledBuild.name}
                             </Button>
                           )}
                           {selectedBuild && (
