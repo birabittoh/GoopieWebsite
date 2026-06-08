@@ -65,7 +65,12 @@ export function LauncherUpdateDialog({ open, onOpenChange }: LauncherUpdateDialo
             </DialogHeader>
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline">No</Button>
+                <Button
+                  variant="outline"
+                  style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)', backgroundColor: 'transparent' }}
+                >
+                  No
+                </Button>
               </DialogClose>
               <Button onClick={startSelfUpdate}>Yes, update now</Button>
             </DialogFooter>
