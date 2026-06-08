@@ -190,6 +190,8 @@ export function Library() {
   // activeSlot.  In browser/CEF the swap uses an opacity cross-fade; in the
   // Tauri/WebKit launcher transitions are disabled (instant swap).
   const isTauri = isInTauriLauncher();
+  // Legacy CEF launcher: in a launcher, but not the new Tauri one.
+  const isLegacyLauncher = isInLauncher() && !isTauri;
   const [slotA, setSlotA] = useState({ src: '' });
   const [slotB, setSlotB] = useState({ src: '' });
   const [activeSlot, setActiveSlot] = useState<'A' | 'B'>('A');
@@ -212,6 +214,9 @@ export function Library() {
   const [extractString, setExtractString] = useState('');
   const [infoBannerDismissed, setInfoBannerDismissed] = useState(() => {
     try { return localStorage.getItem('goopie:infoBannerDismissed') === '1'; } catch { return false; }
+  });
+  const [legacyBannerDismissed, setLegacyBannerDismissed] = useState(() => {
+    try { return localStorage.getItem('goopie:legacyLauncherBannerDismissed') === '1'; } catch { return false; }
   });
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
@@ -724,6 +729,11 @@ export function Library() {
     try { localStorage.setItem('goopie:infoBannerDismissed', infoBannerDismissed ? '1' : '0'); } catch { /* quota */ }
   }, [infoBannerDismissed]);
 
+  // Persist the legacy-launcher upgrade-banner dismissal across page loads.
+  useEffect(() => {
+    try { localStorage.setItem('goopie:legacyLauncherBannerDismissed', legacyBannerDismissed ? '1' : '0'); } catch { /* quota */ }
+  }, [legacyBannerDismissed]);
+
   const handleSelectGame = useCallback((id: string) => {
     setSelectedGameId(id);
     setShowMobileDetail(true);
@@ -796,6 +806,28 @@ export function Library() {
               )}
             </>
           )}
+        </div>
+      )}
+      {isLegacyLauncher && !legacyBannerDismissed && (
+        <div className="bg-yellow-400 px-4 md:px-6 py-2 flex items-center justify-center gap-2 md:gap-3 relative z-10 text-center pr-8">
+          <AlertTriangle className="w-4 h-4 text-yellow-950 shrink-0" />
+          <span className="text-yellow-950 text-xs md:text-sm font-semibold leading-tight">
+            A new, self-updating Goopie launcher is available.{' '}
+            <a
+              className="underline font-bold cursor-pointer hover:text-black"
+              onClick={() => openExternal('https://goopie.xyz/downloads')}
+            >
+              Download it at goopie.xyz/downloads
+            </a>
+            . Please uninstall the old launcher before installing the new one.
+          </span>
+          <button
+            onClick={() => setLegacyBannerDismissed(true)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-yellow-950 hover:text-black transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
       {!infoBannerDismissed && (
