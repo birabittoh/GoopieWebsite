@@ -10,9 +10,11 @@ import { isInTauriLauncher } from '../utils/externalLink';
  * provider simply stays idle for them (`isInTauriLauncher()` gates everything).
  *
  * The native side (`launcher::spawn_update_monitor`) checks for a new release
- * at startup and every 2 hours, caching the result so `CheckForLauncherUpdate`
- * is a cheap synchronous read — we can poll it from here without ever blocking
- * the UI thread (the same concern that `isOfflineMode` had to be fixed for).
+ * roughly every hour — throttled *across restarts* via a persisted last-check
+ * timestamp, so relaunching the app repeatedly doesn't burst requests — caching
+ * the result so `CheckForLauncherUpdate` is a cheap synchronous read we can
+ * poll from here without ever blocking the UI thread (the same concern that
+ * `isOfflineMode` had to be fixed for).
  * Nothing here ever applies an update on its own: that only happens when the
  * user explicitly confirms in the dialog.
  */
@@ -36,8 +38,8 @@ interface LauncherUpdateContextType {
 const LauncherUpdateContext = createContext<LauncherUpdateContextType | null>(null);
 
 // How often to re-poll the (cheap, cached) native check from the page. The
-// native monitor itself only refreshes every 2h — this just makes sure the
-// icon shows up soon after that without needing a page reload.
+// native monitor itself only refreshes roughly hourly — this just makes sure
+// the icon shows up soon after that without needing a page reload.
 const CHECK_POLL_MS = 60_000;
 const PROGRESS_POLL_MS = 500;
 
@@ -51,7 +53,7 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
   const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll the cached native update check. Cheap: it's just an AtomicBool/Mutex
-  // read on the Rust side, refreshed in the background every 2h.
+  // read on the Rust side, refreshed in the background roughly every hour.
   useEffect(() => {
     if (!isInTauriLauncher()) return;
     const w = window as any;
