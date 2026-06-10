@@ -370,6 +370,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const colors = themes[theme] ?? themes.steam;
     const root = document.documentElement;
+    root.style.setProperty('--background', colors.pageBg);
     root.style.setProperty('--theme-page-bg', colors.pageBg);
     root.style.setProperty('--theme-sidebar-bg', colors.sidebarBg);
     root.style.setProperty('--theme-card-bg', colors.cardBg);
