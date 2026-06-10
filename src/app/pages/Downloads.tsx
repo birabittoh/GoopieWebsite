@@ -3,82 +3,40 @@ import { Download } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { Sidebar, SIDEBAR_WIDTH_CLASS } from '../components/Sidebar';
 import { Footer } from '../components/Footer';
-import { fetchReleases, ReleaseAsset } from '../data/useGameReleases';
 import { openExternal } from '../utils/externalLink';
 
-// GoopieLauncher releases are pulled from this GitHub repo.
-const LAUNCHER_REPO = 'birabittoh/GoopieLauncher';
+// Published release assets have stable, versionless names, so we can link
+// straight at GitHub's "latest release" redirect instead of querying the API.
+// .deb is not published (the launcher can only self-update a single portable
+// executable/AppImage — see GoopieLauncher's release workflow).
+const RELEASE_BASE = 'https://github.com/birabittoh/GoopieLauncher/releases/latest/download';
+const WINDOWS_MSI_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.msi`;
+const WINDOWS_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.exe`;
+const LINUX_APPIMAGE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64.AppImage`;
 
-interface LauncherAssets {
-  tag: string;
-  windowsMsi?: ReleaseAsset;
-  windowsExe?: ReleaseAsset;
-  // .deb is no longer published (the launcher can only self-update a single
-  // portable executable/AppImage — see GoopieLauncher's release workflow).
-  linuxAppImage?: ReleaseAsset;
-}
-
-function DownloadButton({ asset, label, loading }: { asset: ReleaseAsset | undefined; label: string; loading: boolean }) {
-  if (loading || asset) {
-    return (
-      <button
-        disabled={loading || !asset}
-        onClick={() => asset && openExternal(asset.url)}
-        className="flex items-center justify-center gap-2 w-44 h-11 rounded-lg text-sm font-semibold shrink-0 transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-wait"
-        style={{
-          background: `linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))`,
-          color: 'var(--theme-text-primary)',
-        }}
-      >
-        <Download className="w-4 h-4" />
-        {label}
-      </button>
-    );
-  }
+function DownloadButton({ url, label }: { url: string; label: string }) {
   return (
-    <span
-      className="flex items-center gap-2 px-5 h-11 rounded-lg text-sm font-semibold shrink-0 opacity-60 cursor-not-allowed"
+    <button
+      onClick={() => openExternal(url)}
+      className="flex items-center justify-center gap-2 w-44 h-11 rounded-lg text-sm font-semibold shrink-0 transition-opacity hover:opacity-90"
       style={{
-        backgroundColor: 'var(--theme-item-selected)',
+        background: `linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))`,
         color: 'var(--theme-text-primary)',
       }}
     >
       <Download className="w-4 h-4" />
-      Currently Unavailable
-    </span>
+      {label}
+    </button>
   );
 }
 
 export function Downloads() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isInCEF, setIsInCEF] = useState(false);
-  const [launcherAssets, setLauncherAssets] = useState<LauncherAssets | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setIsInCEF(typeof (window as any).GetPlatform === 'function');
   }, []);
-
-  useEffect(() => {
-    fetchReleases(LAUNCHER_REPO)
-      .then(releases => {
-        // releases is sorted newest-first; take the latest stable one.
-        const latest = releases.find(r => !r.prerelease) ?? releases[0];
-        if (!latest) return;
-        const find = (pred: (name: string) => boolean) =>
-          latest.assets.find(a => pred(a.name.toLowerCase()));
-        setLauncherAssets({
-          tag: latest.tag,
-          windowsMsi:     find(n => n.endsWith('.msi')),
-          windowsExe:     find(n => n.endsWith('.exe')),
-          linuxAppImage:  find(n => n.endsWith('.appimage')),
-        });
-      })
-      .catch(() => { /* leave launcherAssets null — buttons will show "Unavailable" */ })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const versionLabel = launcherAssets ? ` — ${launcherAssets.tag}` : '';
 
   return (
     <div
@@ -123,8 +81,8 @@ export function Downloads() {
                 Windows x64
               </h2>
               <div className="flex flex-wrap gap-3">
-                <DownloadButton asset={launcherAssets?.windowsMsi} label="Setup (.msi)" loading={loading} />
-                <DownloadButton asset={launcherAssets?.windowsExe} label="Portable (.exe)" loading={loading} />
+                <DownloadButton url={WINDOWS_MSI_URL} label="Setup (.msi)" />
+                <DownloadButton url={WINDOWS_EXE_URL} label="Portable (.exe)" />
               </div>
             </div>
           </div>
@@ -145,7 +103,7 @@ export function Downloads() {
                 Linux x86_64
               </h2>
               <div className="flex flex-wrap gap-3">
-                <DownloadButton asset={launcherAssets?.linuxAppImage} label="AppImage" loading={loading} />
+                <DownloadButton url={LINUX_APPIMAGE_URL} label="AppImage" />
               </div>
             </div>
           </div>
