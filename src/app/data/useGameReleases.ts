@@ -169,9 +169,17 @@ function normalizeArch(arch: string | undefined): { family: ArchFamily; is64: bo
  * Whether a build for `buildPlatform` can run on `hostPlatform`. An unknown
  * value on either side is treated as compatible — we only hide/grey out
  * builds we're confident won't run.
+ *
+ * When `protonReady` is true, Windows builds are treated as compatible on
+ * Linux (the launcher routes them through Proton transparently).
  */
-export function isPlatformCompatible(buildPlatform: string | undefined, hostPlatform: string | undefined): boolean {
+export function isPlatformCompatible(
+  buildPlatform: string | undefined,
+  hostPlatform: string | undefined,
+  protonReady = false,
+): boolean {
   if (!buildPlatform || !hostPlatform) return true;
+  if (protonReady && hostPlatform === 'Linux' && buildPlatform === 'Windows') return true;
   return buildPlatform === hostPlatform;
 }
 
@@ -393,6 +401,22 @@ export function useGameReleases(game: Game | undefined) {
     if (typeof window === 'undefined') return undefined;
     return (window as any).GetArch?.() as string | undefined;
   }, []);
+  // True when all conditions for Proton-mediated Windows compatibility hold:
+  // Linux host, launcher 1.3.0+, user has Proton enabled, and at least one
+  // Proton installation was detected. When true, Windows builds are treated
+  // as compatible and shown/enabled in the Library (the launcher transparently
+  // routes them through Proton at launch time).
+  const protonReady = useMemo<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    if (platform !== 'Linux') return false;
+    if (!isLauncherVersionAtLeast('1.3.0')) return false;
+    const w = window as any;
+    if (typeof w.getUseProton !== 'function') return false;
+    if (!w.getUseProton()) return false;
+    if (typeof w.getProtonInstallations !== 'function') return false;
+    const installs = w.getProtonInstallations();
+    return Array.isArray(installs) && installs.length > 0;
+  }, [platform]);
   const [releases, setReleases] = useState<GameRelease[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -495,8 +519,8 @@ export function useGameReleases(game: Game | undefined) {
   const filterIncompatible = !!platform && isLauncherVersionAtLeast('1.3.0');
   const compatibleAssets = useMemo(() => {
     if (!filterIncompatible || showIncompatible) return sortedAssets;
-    return sortedAssets.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), platform));
-  }, [sortedAssets, filterIncompatible, showIncompatible, platform]);
+    return sortedAssets.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), platform, protonReady));
+  }, [sortedAssets, filterIncompatible, showIncompatible, platform, protonReady]);
 
   // True when every available asset was filtered out as incompatible (and the
   // "show incompatible" escape hatch hasn't been used) — i.e. nothing on this
@@ -563,6 +587,7 @@ export function useGameReleases(game: Game | undefined) {
     setSelectedAsset,
     platform,
     arch,
+    protonReady,
   };
 }
 

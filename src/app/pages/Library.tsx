@@ -353,6 +353,7 @@ export function Library() {
     releasesUpdatedAt,
     platform: launcherPlatform,
     arch: launcherArch,
+    protonReady,
   } = releasesState;
   // Every build of the selected game that is currently installed in its own
   // `builds/<tag>/` directory (see games.rs::get_installed_builds). Multiple
@@ -433,7 +434,7 @@ export function Library() {
         // Mirror the list-hiding in useGameReleases: don't auto-download a
         // build whose filename indicates it's for a different platform.
         if (launcherPlatform && isLauncherVersionAtLeast('1.3.0')) {
-          const compatible = targetSorted.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), launcherPlatform));
+          const compatible = targetSorted.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), launcherPlatform, protonReady));
           if (compatible.length > 0) targetSorted = compatible;
         }
         // Mirror the platform-aware logic in effectiveAsset: prefer the game's
@@ -631,7 +632,7 @@ export function Library() {
   // the launcher version so older launchers — which never send platform/arch —
   // never grey out Play.
   const selectedBuildCompatible = !isLauncherVersionAtLeast('1.3.0') || !selectedBuild
-    || (isPlatformCompatible(selectedBuild.platform, launcherPlatform) && isArchCompatible(selectedBuild.arch, launcherArch));
+    || (isPlatformCompatible(selectedBuild.platform, launcherPlatform, protonReady) && isArchCompatible(selectedBuild.arch, launcherArch));
 
   const incompatibleBuildReason = selectedBuild && !selectedBuildCompatible
     ? `This build is for ${selectedBuild.platform ?? 'a different platform'}${selectedBuild.arch ? ` (${selectedBuild.arch})` : ''} and can't run on your system${launcherPlatform ? ` (${launcherPlatform}${launcherArch ? `, ${launcherArch}` : ''})` : ''}.`
