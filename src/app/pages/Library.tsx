@@ -631,7 +631,11 @@ export function Library() {
   // failed) are treated as compatible so they aren't falsely blocked. Gated on
   // the launcher version so older launchers — which never send platform/arch —
   // never grey out Play.
-  const selectedBuildCompatible = !isLauncherVersionAtLeast('1.3.0') || !selectedBuild
+  // Whether platform-based filtering is active: requires 1.3.0+ and a known host
+  // platform. Gates the "Show incompatible builds" checkbox and related UI.
+  const filterBuilds = !!launcherPlatform && isLauncherVersionAtLeast('1.3.0');
+
+  const selectedBuildCompatible = !filterBuilds || !selectedBuild
     || (isPlatformCompatible(selectedBuild.platform, launcherPlatform, protonReady) && isArchCompatible(selectedBuild.arch, launcherArch));
 
   const incompatibleBuildReason = selectedBuild && !selectedBuildCompatible
@@ -1229,8 +1233,8 @@ export function Library() {
                             compatibleAssets={compatibleAssets}
                             noCompatibleBuilds={noCompatibleBuilds}
                             platform={launcherPlatform}
-                            showIncompatible={showIncompatible}
-                            setShowIncompatible={setShowIncompatible}
+                            showIncompatible={filterBuilds ? showIncompatible : undefined}
+                            setShowIncompatible={filterBuilds ? setShowIncompatible : undefined}
                             selectedTag={selectedTag}
                             selectedAsset={selectedAsset}
                             setSelectedTag={setSelectedTag}
