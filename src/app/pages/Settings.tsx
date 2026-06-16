@@ -61,7 +61,7 @@ export function Settings() {
     typeof w.GetPlatform === 'function' &&
     w.GetPlatform() === 'Linux';
   const [protonInstalls, setProtonInstalls] = useState<ProtonInstall[]>([]);
-  const [useProton, setUseProton] = useState<boolean>(true);
+  const [useProton, setUseProton] = useState<boolean>(false);
   const [selectedProton, setSelectedProton] = useState<string>('');
 
   useEffect(() => {
