@@ -311,11 +311,15 @@ export async function fetchReleases(repo: string): Promise<GameRelease[]> {
         prerelease: !!r.prerelease,
         publishedAt: r.published_at ?? r.created_at,
         assets: Array.isArray(r.assets)
-          ? r.assets.map((a: any) => ({
-              name: String(a.name ?? ''),
-              url: String(a.browser_download_url ?? ''),
-              size: typeof a.size === 'number' ? a.size : undefined,
-            }))
+          ? r.assets
+              // `.toml` files are launcher config sidecars published alongside
+              // the executable, not runnable builds — never list them.
+              .filter((a: any) => !String(a.name ?? '').toLowerCase().endsWith('.toml'))
+              .map((a: any) => ({
+                name: String(a.name ?? ''),
+                url: String(a.browser_download_url ?? ''),
+                size: typeof a.size === 'number' ? a.size : undefined,
+              }))
           : [],
       }))
       .filter(r => r.tag)
