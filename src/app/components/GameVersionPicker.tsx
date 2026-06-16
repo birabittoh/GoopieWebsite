@@ -17,6 +17,9 @@ interface Props {
   noCompatibleBuilds?: boolean;
   /** Detected host platform ("Windows" | "Linux" | "macOS"), if known. */
   platform?: string;
+  /** True when Proton is enabled and a Proton install was detected (Linux). When
+   *  false on Linux, the "no supported builds" message suggests enabling it. */
+  protonReady?: boolean;
   selectedTag: string | undefined;
   selectedAsset: string | undefined;
   setSelectedTag: (tag: string | undefined) => void;
@@ -53,6 +56,7 @@ export function GameVersionPicker({
   compatibleAssets,
   noCompatibleBuilds,
   platform,
+  protonReady,
   selectedTag,
   selectedAsset,
   setSelectedTag,
@@ -140,7 +144,10 @@ export function GameVersionPicker({
 
         {noCompatibleBuilds && (
           <div className="text-xs text-amber-400">
-            No builds compatible with your system{platform ? ` (${platform})` : ''}.
+            There are currently no supported builds for your system{platform ? ` (${platform})` : ''}.
+            {platform === 'Linux' && !protonReady && (
+              <> Try enabling Proton support in the launcher settings.</>
+            )}
           </div>
         )}
 

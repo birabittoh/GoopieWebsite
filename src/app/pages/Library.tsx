@@ -170,16 +170,11 @@ export function Library() {
   const [statusFilters, setStatusFilters] = useState<Game['status'][]>(['Featured', 'Enhanced', 'Playable', 'Gameplay', 'Loads']);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [hideExternal, setHideExternal] = useState(false);
-  const [platformFilters, setPlatformFilters] = useState<Platform[]>(() => {
-    const w = window as any;
-    if (w.GetPlatform) {
-      const plat: string = w.GetPlatform();
-      if (plat === 'Windows') return ['Windows'] as Platform[];
-      if (plat === 'macOS') return ['Mac'] as Platform[];
-      if (plat === 'Linux') return ['Linux'] as Platform[];
-    }
-    return [];
-  });
+  // The Library lists every game regardless of host platform; per-game
+  // compatibility is surfaced on the game's own page (no supported builds /
+  // Proton hint), and the dedicated Installed page is the installed-only view.
+  // The platform-filter chips still work when the user picks them manually.
+  const [platformFilters, setPlatformFilters] = useState<Platform[]>([]);
   const [audioKey, setAudioKey] = useState(0);
   const [audioMuted, setAudioMuted] = useState(() => {
     try { return localStorage.getItem('goopie:audioMuted') === '1'; } catch { return false; }
@@ -326,6 +321,15 @@ export function Library() {
   }, [selectedGameId, visibleGames, filteredGames, urlRecompName]);
 
   const selectedGame = visibleGames.find(g => g.id === selectedGameId);
+
+  // A launch failure belongs to the game that was launched; drop it (and clear
+  // the launcher-side copy) when the user switches games so it can't linger on
+  // an unrelated game's page.
+  useEffect(() => {
+    setLaunchError(null);
+    const w = window as any;
+    if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
+  }, [selectedGameId]);
 
   // Per-game launcher cvar settings (persisted in localStorage).
   const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs } =
@@ -641,6 +645,16 @@ export function Library() {
   const incompatibleBuildReason = selectedBuild && !selectedBuildCompatible
     ? `This build is for ${selectedBuild.platform ?? 'a different platform'}${selectedBuild.arch ? ` (${selectedBuild.arch})` : ''} and can't run on your system${launcherPlatform ? ` (${launcherPlatform}${launcherArch ? `, ${launcherArch}` : ''})` : ''}.`
     : undefined;
+
+  // Shown in place of the Install button when the selected release has no build
+  // that can run on this system, so the user isn't offered an install that would
+  // immediately fail to launch.
+  const noSupportedBuildsNotice = (
+    <p className="text-sm w-full" style={{ color: 'var(--theme-text-muted)' }}>
+      There are currently no supported builds for your system{launcherPlatform ? ` (${launcherPlatform})` : ''}.
+      {launcherPlatform === 'Linux' && !protonReady && ' Try enabling Proton support in the launcher settings.'}
+    </p>
+  );
 
   // Entry point for any Play action: if a *different* game — or a different
   // build of this game — is running, prompt before closing it (unsaved
@@ -1057,7 +1071,11 @@ export function Library() {
                       <span>{launchError}</span>
                       <button
                         type="button"
-                        onClick={() => setLaunchError(null)}
+                        onClick={() => {
+                          setLaunchError(null);
+                          const w = window as any;
+                          if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
+                        }}
                         className="shrink-0 opacity-70 hover:opacity-100"
                         aria-label="Dismiss"
                       >
@@ -1185,13 +1203,17 @@ export function Library() {
                              either way the action installs it into its own build dir
                              without touching any other installed build. */
                           <div className="flex flex-wrap gap-3">
-                            <Button
-                              className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg"
-                              onClick={triggerUpdate}
-                            >
-                              <Download className="w-5 h-5 mr-2" />
-                              {selectedBuild ? 'Update' : 'Install'}
-                            </Button>
+                            {noCompatibleBuilds && !selectedBuild ? (
+                              noSupportedBuildsNotice
+                            ) : (
+                              <Button
+                                className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg"
+                                onClick={triggerUpdate}
+                              >
+                                <Download className="w-5 h-5 mr-2" />
+                                {selectedBuild ? 'Update' : 'Install'}
+                              </Button>
+                            )}
                             {selectedBuild ? (
                               <Button
                                 className="bg-[#8b1a1a] hover:bg-[#a52525] text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
@@ -1233,6 +1255,7 @@ export function Library() {
                             compatibleAssets={compatibleAssets}
                             noCompatibleBuilds={noCompatibleBuilds}
                             platform={launcherPlatform}
+                            protonReady={protonReady}
                             showIncompatible={filterBuilds ? showIncompatible : undefined}
                             setShowIncompatible={filterBuilds ? setShowIncompatible : undefined}
                             selectedTag={selectedTag}
@@ -1514,9 +1537,13 @@ export function Library() {
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
-                            <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
-                          </Button>
+                          {noCompatibleBuilds && !selectedBuild ? (
+                            noSupportedBuildsNotice
+                          ) : (
+                            <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
+                              <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
+                            </Button>
+                          )}
                           {selectedBuild ? (
                             <Button className="bg-[#8b1a1a] hover:bg-[#a52525] text-white px-4 py-2 text-sm" onClick={() => removeBuild(selectedBuild)}>
                               <Trash2 className="w-4 h-4 mr-1" /> Uninstall
