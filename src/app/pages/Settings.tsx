@@ -371,8 +371,8 @@ export function Settings() {
           <section>
             <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Proton (Linux)</h2>
             <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
-              Proton lets you run Windows builds on Linux. When enabled, the launcher automatically
-              routes Windows executables through Proton and creates a per-game Wine prefix on first launch.
+              Proton lets you run Windows builds on Linux. Keep in mind, Proton has not been tested with
+              every game and may cause issues with some titles.
             </p>
 
             {/* Use Proton toggle */}
