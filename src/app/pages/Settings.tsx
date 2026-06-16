@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, ArrowLeft, FolderOpen, Globe, Wifi, WifiOff } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useTheme, type ThemeName } from '../theme/ThemeContext';
 import { getFpsEnabled, setFpsEnabled } from '../components/FpsCounter';
 import { isInTauriLauncher } from '../utils/externalLink';
@@ -63,6 +63,21 @@ export function Settings() {
   const [protonInstalls, setProtonInstalls] = useState<ProtonInstall[]>([]);
   const [useProton, setUseProton] = useState<boolean>(false);
   const [selectedProton, setSelectedProton] = useState<string>('');
+
+  // Allow deep-linking to the Proton option (e.g. from the Library's "enable
+  // Proton" hint via /settings#proton): scroll it into view and flash a ring.
+  const location = useLocation();
+  const protonRef = useRef<HTMLElement>(null);
+  const [highlightProton, setHighlightProton] = useState(false);
+  useEffect(() => {
+    if (location.hash !== '#proton' || !isLinuxLauncher) return;
+    const t = setTimeout(() => {
+      protonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setHighlightProton(true);
+      setTimeout(() => setHighlightProton(false), 2000);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [location.hash, isLinuxLauncher]);
 
   useEffect(() => {
     if (w.GetGamesPath) {
@@ -368,7 +383,12 @@ export function Settings() {
 
         {/* Proton section — only shown on Linux launcher 1.3.0+ */}
         {isLinuxLauncher && (
-          <section>
+          <section
+            id="proton"
+            ref={protonRef}
+            className="scroll-mt-4 rounded-xl transition-shadow"
+            style={highlightProton ? { boxShadow: '0 0 0 2px var(--theme-accent)' } : undefined}
+          >
             <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Proton (Linux)</h2>
             <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
               Proton lets you run Windows builds on Linux. Keep in mind, Proton has not been tested with

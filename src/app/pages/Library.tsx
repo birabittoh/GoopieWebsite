@@ -652,7 +652,15 @@ export function Library() {
   const noSupportedBuildsNotice = (
     <p className="text-sm w-full" style={{ color: 'var(--theme-text-muted)' }}>
       There are currently no supported builds for your system{launcherPlatform ? ` (${launcherPlatform})` : ''}.
-      {launcherPlatform === 'Linux' && !protonReady && ' Try enabling Proton support in the launcher settings.'}
+      {launcherPlatform === 'Linux' && !protonReady && (
+        <>
+          {' '}Try{' '}
+          <Link to="/settings#proton" className="underline hover:no-underline">
+            enabling Proton support
+          </Link>
+          {' '}in the launcher settings.
+        </>
+      )}
     </p>
   );
 

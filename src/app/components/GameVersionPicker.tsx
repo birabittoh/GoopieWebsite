@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Check, ChevronDown, Package } from 'lucide-react';
 import { Game } from '../types/game';
 import { GameRelease, InstalledInfo, ReleaseAsset } from '../data/useGameReleases';
@@ -146,7 +147,13 @@ export function GameVersionPicker({
           <div className="text-xs text-amber-400">
             There are currently no supported builds for your system{platform ? ` (${platform})` : ''}.
             {platform === 'Linux' && !protonReady && (
-              <> Try enabling Proton support in the launcher settings.</>
+              <>
+                {' '}Try{' '}
+                <Link to="/settings#proton" className="underline hover:no-underline">
+                  enabling Proton support
+                </Link>
+                {' '}in the launcher settings.
+              </>
             )}
           </div>
         )}
