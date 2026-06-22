@@ -313,7 +313,7 @@ export function Home() {
                   )}
                 </div>
                 <a
-                  href="https://discord.gg/vq4GcEs46M"
+                  href="https://discord.gg/CNTxwSNZfT"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="self-start inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#5865F2] hover:bg-[#4752c4] text-white text-sm font-semibold transition-colors"
@@ -322,7 +322,7 @@ export function Home() {
                   Join Server
                 </a>
                 <iframe
-                  src="https://discord.com/widget?id=1513356298874388640&theme=dark"
+                  src="https://discord.com/widget?id=1461417878891921523&theme=dark"
                   width="100%"
                   height="400"
                   allowTransparency={true}
