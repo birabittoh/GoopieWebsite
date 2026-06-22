@@ -37,24 +37,29 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '../components/ui/toolti
 import { BackgroundAudioPlayer } from '../components/BackgroundAudioPlayer';
 import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
-import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, readInstalledBuilds, findInstalledBuild, useGameReleases, type InstalledBuild } from '../data/useGameReleases';
+import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, detectAssetPlatform, isPlatformCompatible, isArchCompatible, readInstalledBuilds, findInstalledBuild, useGameReleases, type InstalledBuild } from '../data/useGameReleases';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 import { GameVersionPicker } from '../components/GameVersionPicker';
 import { isInLauncher, isInTauriLauncher, openExternal as openExternalUrl } from '../utils/externalLink';
 
 const statusColors: Record<Game['status'], string> = {
-  Ingame: 'bg-red-500 text-white',
-  Stable: 'bg-green-500 text-white',
-  Playable: 'bg-white text-black',
+  Featured: 'bg-purple-600 text-white',
   Enhanced: 'bg-blue-500 text-white',
-  External: 'bg-orange-500 text-white',
+  Playable: 'bg-green-700 text-white',
+  Gameplay: 'bg-green-400 text-black',
+  Loads: 'bg-orange-500 text-white',
+  Unplayable: 'bg-red-500 text-white',
+  Unknown: 'bg-gray-600 text-white',
 };
 
 const statusDescriptions: Record<Game['status'], string> = {
-  Enhanced: '100% playable with no crashes and includes mods',
-  Stable: '100% playable with no crashes',
-  Playable: 'Very little crashes',
-  Ingame: 'Very little crashes but has graphics issues',
-  External: 'Uses an external launcher download',
+  Featured: 'Creator curated — Enhanced and recommended by the Rexglue team',
+  Enhanced: 'Playable with enhancements like mods or texture packs',
+  Playable: 'Works from start to finish with minor issues',
+  Gameplay: 'Can get into gameplay, completion unknown',
+  Loads: 'Reaches the main menu',
+  Unplayable: 'Crashes too much or has major issues',
+  Unknown: 'Untested',
 };
 
 /**
@@ -162,19 +167,14 @@ export function Library() {
   const { setAccentColor } = useBackgroundAccent();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
-  const [statusFilters, setStatusFilters] = useState<Game['status'][]>(['Enhanced', 'Stable', 'Playable', 'External']);
+  const [statusFilters, setStatusFilters] = useState<Game['status'][]>(['Featured', 'Enhanced', 'Playable', 'Gameplay', 'Loads']);
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [hideExternal, setHideExternal] = useState(false);
-  const [platformFilters, setPlatformFilters] = useState<Platform[]>(() => {
-    const w = window as any;
-    if (w.GetPlatform) {
-      const plat: string = w.GetPlatform();
-      if (plat === 'Windows') return ['Windows'] as Platform[];
-      if (plat === 'macOS') return ['Mac'] as Platform[];
-      if (plat === 'Linux') return ['Linux'] as Platform[];
-    }
-    return [];
-  });
+  // The Library lists every game regardless of host platform; per-game
+  // compatibility is surfaced on the game's own page (no supported builds /
+  // Proton hint), and the dedicated Installed page is the installed-only view.
+  // The platform-filter chips still work when the user picks them manually.
+  const [platformFilters, setPlatformFilters] = useState<Platform[]>([]);
   const [audioKey, setAudioKey] = useState(0);
   const [audioMuted, setAudioMuted] = useState(() => {
     try { return localStorage.getItem('goopie:audioMuted') === '1'; } catch { return false; }
@@ -224,17 +224,24 @@ export function Library() {
   const [runningGame, setRunningGame] = useState<{ game: string; build: string } | null>(null);
   const runningGameRef = useRef<{ game: string; build: string; secondsPlayed: number } | null>(null);
   const [pendingPlayBuild, setPendingPlayBuild] = useState<InstalledBuild | null>(null);
+  // Most recent launch failure reported by the launcher (e.g. the installed
+  // build's executable is missing/incompatible, or failed to spawn). `Play`
+  // runs fire-and-forget on a background thread, so this is filled in by
+  // polling `getLaunchError` -- see the running-game poll effect below.
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   const visibleGames = useMemo(() => {
     return getVisibleGames(user?.role, user?.assignedGames || []);
   }, [games, user, getVisibleGames]);
 
   const statusOrder: Record<Game['status'], number> = {
-    Enhanced: 0,
-    Stable: 1,
+    Featured: 0,
+    Enhanced: 1,
     Playable: 2,
-    Ingame: 3,
-    External: 4,
+    Gameplay: 3,
+    Loads: 4,
+    Unplayable: 5,
+    Unknown: 6,
   };
 
   const allTags = useMemo(() => {
@@ -271,7 +278,6 @@ export function Library() {
         const matchesStatus = statusFilters.length === 0 || statusFilters.includes(game.status);
         const matchesTags = tagFilters.length === 0 || tagFilters.some(tag => game.Tags.includes(tag));
         const matchesExternal = !hideExternal || !game.externalLauncherUrl;
-        if (isInCEF && game.status === 'External') return false;
         const matchesPlatform = platformFilters.length === 0 || platformFilters.some(p => game.platforms?.includes(p));
         return matchesStatus && matchesTags && matchesExternal && matchesPlatform;
       })
@@ -316,6 +322,15 @@ export function Library() {
 
   const selectedGame = visibleGames.find(g => g.id === selectedGameId);
 
+  // A launch failure belongs to the game that was launched; drop it (and clear
+  // the launcher-side copy) when the user switches games so it can't linger on
+  // an unrelated game's page.
+  useEffect(() => {
+    setLaunchError(null);
+    const w = window as any;
+    if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
+  }, [selectedGameId]);
+
   // Per-game launcher cvar settings (persisted in localStorage).
   const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs } =
     useCvarSettings(selectedGame?.id, selectedGame?.cvars);
@@ -326,9 +341,12 @@ export function Library() {
     repo: githubRepo,
     releases: allReleases,
     visibleReleases,
-    sortedAssets,
+    compatibleAssets,
+    noCompatibleBuilds,
     showNightlies,
     setShowNightlies,
+    showIncompatible,
+    setShowIncompatible,
     selectedTag,
     selectedAsset,
     setSelectedTag,
@@ -339,6 +357,7 @@ export function Library() {
     releasesUpdatedAt,
     platform: launcherPlatform,
     arch: launcherArch,
+    protonReady,
   } = releasesState;
   // Every build of the selected game that is currently installed in its own
   // `builds/<tag>/` directory (see games.rs::get_installed_builds). Multiple
@@ -415,7 +434,13 @@ export function Library() {
       const installedIsNightly = allReleases.find(r => r.tag === selectedBuild?.version)?.prerelease ?? false;
       const target = allReleases.filter(r => r.prerelease === installedIsNightly)[0];
       if (target) {
-        const targetSorted = sortAssetsByRelevance(target.assets, launcherPlatform, launcherArch);
+        let targetSorted = sortAssetsByRelevance(target.assets, launcherPlatform, launcherArch);
+        // Mirror the list-hiding in useGameReleases: don't auto-download a
+        // build whose filename indicates it's for a different platform.
+        if (launcherPlatform && isLauncherVersionAtLeast('1.3.0')) {
+          const compatible = targetSorted.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), launcherPlatform, protonReady));
+          if (compatible.length > 0) targetSorted = compatible;
+        }
         // Mirror the platform-aware logic in effectiveAsset: prefer the game's
         // explicit suffix, then the top of the platform-sorted list when the
         // platform is known, then fall back to the legacy helper.
@@ -567,6 +592,14 @@ export function Library() {
         if (prevState?.game === next?.game && prevState?.build === next?.build) return prevState;
         return next ? { game: next.game, build: next.build } : null;
       });
+
+      // Surface any launch failure from the last Play attempt (missing/
+      // incompatible executable, spawn error, ...). Cleared by the launcher
+      // once read, and again by us right before the next Play attempt.
+      if (typeof w.getLaunchError === 'function') {
+        const err = w.getLaunchError();
+        if (err) setLaunchError(String(err));
+      }
     };
     poll();
     const interval = setInterval(poll, 2000);
@@ -580,6 +613,8 @@ export function Library() {
     const w = window as any;
     if (typeof w.Play !== 'function') return;
     setAudioMuted(true);
+    setLaunchError(null);
+    if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
     w.Play(selectedGame.recompName, build.name, buildCvarArgs(), undefined, selectedGame.setGameDataRootToAssets === true);
   }, [selectedGame, buildCvarArgs]);
 
@@ -593,6 +628,41 @@ export function Library() {
   // actually running (vs. a different build of the same game, or another game
   // entirely — both of which still show "Play" but prompt to close first).
   const isSelectedBuildRunning = !!(selectedBuild && runningBuildForSelectedGame === selectedBuild.name);
+
+  // Whether the selected *installed* build can actually run here, based on the
+  // platform/arch the launcher detected from its executable at install time
+  // (see games.rs's binfmt scan). Unknown values (older installs, or detection
+  // failed) are treated as compatible so they aren't falsely blocked. Gated on
+  // the launcher version so older launchers — which never send platform/arch —
+  // never grey out Play.
+  // Whether platform-based filtering is active: requires 1.3.0+ and a known host
+  // platform. Gates the "Show incompatible builds" checkbox and related UI.
+  const filterBuilds = !!launcherPlatform && isLauncherVersionAtLeast('1.3.0');
+
+  const selectedBuildCompatible = !filterBuilds || !selectedBuild
+    || (isPlatformCompatible(selectedBuild.platform, launcherPlatform, protonReady) && isArchCompatible(selectedBuild.arch, launcherArch));
+
+  const incompatibleBuildReason = selectedBuild && !selectedBuildCompatible
+    ? `This build is for ${selectedBuild.platform ?? 'a different platform'}${selectedBuild.arch ? ` (${selectedBuild.arch})` : ''} and can't run on your system${launcherPlatform ? ` (${launcherPlatform}${launcherArch ? `, ${launcherArch}` : ''})` : ''}.`
+    : undefined;
+
+  // Shown in place of the Install button when the selected release has no build
+  // that can run on this system, so the user isn't offered an install that would
+  // immediately fail to launch.
+  const noSupportedBuildsNotice = (
+    <p className="text-sm w-full" style={{ color: 'var(--theme-text-muted)' }}>
+      There are currently no supported builds for your system{launcherPlatform ? ` (${launcherPlatform})` : ''}.
+      {launcherPlatform === 'Linux' && !protonReady && (
+        <>
+          {' '}Try{' '}
+          <Link to="/settings#proton" className="underline hover:no-underline">
+            enabling Proton support
+          </Link>
+          {' '}in the launcher settings.
+        </>
+      )}
+    </p>
+  );
 
   // Entry point for any Play action: if a *different* game — or a different
   // build of this game — is running, prompt before closing it (unsaved
@@ -899,9 +969,26 @@ export function Library() {
                 )}
                 <div className="absolute inset-0" style={{ background: `linear-gradient(to top, var(--theme-page-bg), color-mix(in srgb, var(--theme-page-bg) 50%, transparent), transparent)` }}></div>
 
+                {/* Discord widget — top-right of header */}
+                {selectedGame.discordGuildId && !isInCEF && (
+                  <div className="absolute top-3 right-3 z-20 hidden md:block rounded-xl overflow-hidden shadow-2xl" style={{ width: 300, height: 420 }}>
+                    <iframe
+                      src={`https://discord.com/widget?id=${selectedGame.discordGuildId}&theme=dark`}
+                      width="300"
+                      height="420"
+                      allowTransparency={true}
+                      frameBorder={0}
+                      sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+                      title="Discord"
+                      className="w-full h-full block"
+                    />
+                  </div>
+                )}
+
                 {/* Desktop: overlay content on the header image */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 hidden md:block">
                   <div className="flex items-center gap-3 mb-4 flex-wrap">
+                    {!selectedGame.hideTitleText && (
                     <h1
                       className="text-5xl font-bold"
                       style={{
@@ -911,6 +998,7 @@ export function Library() {
                     >
                       {selectedGame.title}
                     </h1>
+                    )}
                     {selectedGame.isPublic === false && (
                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-500 text-white flex items-center gap-1">
                         <EyeOff className="w-3 h-3" /> Not Public
@@ -986,6 +1074,23 @@ export function Library() {
                       <Star className="w-5 h-5" fill={isFavorite(selectedGame.id) ? 'currentColor' : 'none'} />
                     </button>
                   </div>
+                  {launchError && (
+                    <div className="flex items-start justify-between gap-3 p-3 mb-3 rounded-lg shadow bg-red-950/80 border border-red-500/40 text-sm text-red-200">
+                      <span>{launchError}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLaunchError(null);
+                          const w = window as any;
+                          if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
+                        }}
+                        className="shrink-0 opacity-70 hover:opacity-100"
+                        aria-label="Dismiss"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex flex-row items-end justify-between gap-4">
                   <div>
                   {selectedGame.externalLauncherUrl ? (
@@ -1036,12 +1141,19 @@ export function Library() {
                               </Button>
                             ) : (
                               <Button
-                                className="bg-[#5c7e10] hover:bg-[#78a00f] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg"
+                                className="bg-[#5c7e10] hover:bg-[#78a00f] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#5c7e10]"
                                 onClick={() => selectedBuild && requestPlay(selectedBuild)}
+                                disabled={!selectedBuildCompatible}
+                                title={incompatibleBuildReason}
                               >
                                 <Play className="w-5 h-5 mr-2" />
                                 Play
                               </Button>
+                            )}
+                            {incompatibleBuildReason && (
+                              <p className="text-sm w-full" style={{ color: 'var(--theme-text-muted)' }}>
+                                {incompatibleBuildReason}
+                              </p>
                             )}
                             {(selectionMismatch || newerReleaseAvailable) && (
                               <Button
@@ -1099,13 +1211,17 @@ export function Library() {
                              either way the action installs it into its own build dir
                              without touching any other installed build. */
                           <div className="flex flex-wrap gap-3">
-                            <Button
-                              className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg"
-                              onClick={triggerUpdate}
-                            >
-                              <Download className="w-5 h-5 mr-2" />
-                              {selectedBuild ? 'Update' : 'Install'}
-                            </Button>
+                            {noCompatibleBuilds && !selectedBuild ? (
+                              noSupportedBuildsNotice
+                            ) : (
+                              <Button
+                                className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg"
+                                onClick={triggerUpdate}
+                              >
+                                <Download className="w-5 h-5 mr-2" />
+                                {selectedBuild ? 'Update' : 'Install'}
+                              </Button>
+                            )}
                             {selectedBuild ? (
                               <Button
                                 className="bg-[#8b1a1a] hover:bg-[#a52525] text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
@@ -1144,7 +1260,12 @@ export function Library() {
                           <GameVersionPicker
                             game={selectedGame}
                             visibleReleases={visibleReleases}
-                            sortedAssets={sortedAssets}
+                            compatibleAssets={compatibleAssets}
+                            noCompatibleBuilds={noCompatibleBuilds}
+                            platform={launcherPlatform}
+                            protonReady={protonReady}
+                            showIncompatible={filterBuilds ? showIncompatible : undefined}
+                            setShowIncompatible={filterBuilds ? setShowIncompatible : undefined}
                             selectedTag={selectedTag}
                             selectedAsset={selectedAsset}
                             setSelectedTag={setSelectedTag}
@@ -1376,9 +1497,19 @@ export function Library() {
                               <X className="w-4 h-4 mr-1" /> Close
                             </Button>
                           ) : (
-                            <Button className="bg-[#5c7e10] hover:bg-[#78a00f] text-white px-4 py-2 text-sm" onClick={() => selectedBuild && requestPlay(selectedBuild)}>
+                            <Button
+                              className="bg-[#5c7e10] hover:bg-[#78a00f] text-white px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#5c7e10]"
+                              onClick={() => selectedBuild && requestPlay(selectedBuild)}
+                              disabled={!selectedBuildCompatible}
+                              title={incompatibleBuildReason}
+                            >
                               <Play className="w-4 h-4 mr-1" /> Play
                             </Button>
+                          )}
+                          {incompatibleBuildReason && (
+                            <p className="text-xs w-full" style={{ color: 'var(--theme-text-muted)' }}>
+                              {incompatibleBuildReason}
+                            </p>
                           )}
                           {(selectionMismatch || newerReleaseAvailable) && (
                             <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
@@ -1414,9 +1545,13 @@ export function Library() {
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
-                            <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
-                          </Button>
+                          {noCompatibleBuilds && !selectedBuild ? (
+                            noSupportedBuildsNotice
+                          ) : (
+                            <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
+                              <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
+                            </Button>
+                          )}
                           {selectedBuild ? (
                             <Button className="bg-[#8b1a1a] hover:bg-[#a52525] text-white px-4 py-2 text-sm" onClick={() => removeBuild(selectedBuild)}>
                               <Trash2 className="w-4 h-4 mr-1" /> Uninstall
@@ -1439,7 +1574,11 @@ export function Library() {
                           compact
                           game={selectedGame}
                           visibleReleases={visibleReleases}
-                          sortedAssets={sortedAssets}
+                          compatibleAssets={compatibleAssets}
+                          noCompatibleBuilds={noCompatibleBuilds}
+                          platform={launcherPlatform}
+                          showIncompatible={showIncompatible}
+                          setShowIncompatible={setShowIncompatible}
                           selectedTag={selectedTag}
                           selectedAsset={selectedAsset}
                           setSelectedTag={setSelectedTag}
@@ -1678,6 +1817,7 @@ export function Library() {
                         </div>
                       </div>
                     )}
+
                   </div>
                 </div>
               </div>
@@ -1849,7 +1989,7 @@ function GameNewsSection({ posts }: { posts: import('../data/useNews').NewsPost[
       <h2 className="text-2xl font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
         <Newspaper className="w-5 h-5" /> News
       </h2>
-      <div className="space-y-6">
+      <div className="space-y-3">
         {ordered.map((post) => (
           <GameNewsHeader key={post.id} post={post} />
         ))}
@@ -1863,6 +2003,7 @@ function GameNewsHeader({ post }: { post: import('../data/useNews').NewsPost }) 
     ? post.thumbnails
     : (post.thumbnail ? [post.thumbnail] : []);
   const [imgIdx, setImgIdx] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const displayDate = post.publishedAt ?? post.createdAt;
   const tags = post.tags || [];
   const cover = images[imgIdx];
@@ -1871,6 +2012,25 @@ function GameNewsHeader({ post }: { post: import('../data/useNews').NewsPost }) 
       className="rounded-lg overflow-hidden"
       style={{ border: '1px solid var(--theme-border)', backgroundColor: 'var(--theme-page-bg)' }}
     >
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+        style={{ color: 'var(--theme-text-primary)' }}
+      >
+        <div className="flex flex-col min-w-0">
+          <span className="font-semibold truncate">{post.title || 'Untitled'}</span>
+          <span className="text-xs opacity-60">
+            {formatNewsDate(displayDate)}{post.authorName ? ` • ${post.authorName}` : ''}
+          </span>
+        </div>
+        <ChevronDown
+          className="w-4 h-4 shrink-0 transition-transform"
+          style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+      </button>
+      {expanded && (
+        <div>
       {cover && (
         <div className="relative w-full" style={{ aspectRatio: '21 / 9', backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <img
@@ -1964,6 +2124,8 @@ function GameNewsHeader({ post }: { post: import('../data/useNews').NewsPost }) 
           <Markdown source={post.body || ''} />
         </div>
       </div>
+        </div>
+      )}
     </article>
   );
 }

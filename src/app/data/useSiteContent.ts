@@ -4,7 +4,7 @@ import { db } from '../firebase';
 import { useAuth } from '../auth/AuthContext';
 import { isOfflineMode } from '../utils/externalLink';
 
-export type SiteContentKey = 'homeTagline' | 'footerCopyright' | 'eula' | 'privacy';
+export type SiteContentKey = 'homeTagline' | 'footerCopyright' | 'eula' | 'privacy' | 'discordRexGlue' | 'discordGoopie' | 'communityHeading' | 'communitySubtitle' | 'homeFaq';
 
 /**
  * Subscribe to a single site-content document. Returns the raw data plus

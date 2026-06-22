@@ -6,8 +6,10 @@ interface CoverArtBackgroundProps {
   tileWidth?: number;
   angle?: number;
   overlayOpacity?: number;
+  overlayColor?: string;
   rows?: number;
   speed?: number;
+  zIndex?: number;
 }
 
 function hash(n: number) {
@@ -23,8 +25,10 @@ export function CoverArtBackground({
   tileWidth = 180,
   angle = 22,
   overlayOpacity = 0.78,
+  overlayColor,
   rows = 11,
   speed = 18,
+  zIndex = 0,
 }: CoverArtBackgroundProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -177,7 +181,7 @@ export function CoverArtBackground({
       }
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = `rgba(0,0,0,${overlayOpacity})`;
+      ctx.fillStyle = overlayColor ?? `rgba(0,0,0,${overlayOpacity})`;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
 
@@ -235,13 +239,14 @@ export function CoverArtBackground({
       io?.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [rowData, parentSize.w, parentSize.h, stripWidth, stripHeight, tileWidth, tileHeight, angle, speed, overlayOpacity]);
+  }, [rowData, parentSize.w, parentSize.h, stripWidth, stripHeight, tileWidth, tileHeight, angle, speed, overlayOpacity, overlayColor]);
 
   return (
     <div
       ref={containerRef}
       aria-hidden
-      className="pointer-events-none absolute inset-0 overflow-hidden"
+      className="pointer-events-none overflow-hidden"
+      style={{ position: 'fixed', inset: 0, zIndex }}
     >
       <canvas
         ref={canvasRef}

@@ -12,7 +12,7 @@ export interface Game {
   recompiled_developers: string[];
   Tags: string[];
   platforms?: Platform[];
-  status: 'Ingame' | 'Stable' | 'Playable' | 'Enhanced' | 'External';
+  status: 'Featured' | 'Enhanced' | 'Playable' | 'Gameplay' | 'Loads' | 'Unplayable' | 'Unknown';
   coverImage: string;
   headerImage: string | string[];
   titleImage?: string;
@@ -32,6 +32,12 @@ export interface Game {
     reddit?: string;
   };
   /**
+   * Discord server/guild ID for the embedded widget.
+   * Required to show the live Discord widget on the game page.
+   * Find it by enabling Community in your Discord server settings.
+   */
+  discordGuildId?: string;
+  /**
    * Array of media links (YouTube URLs or image URLs)
    */
   mediaLinks?: string[];
@@ -40,6 +46,12 @@ export interface Game {
    * Multiplier for the title image size (1 = 100%, 1.5 = 150%, etc.)
    */
   titleSizeMultiplier?: number;
+
+  /**
+   * When true, the title text is hidden on the Library page (useful when
+   * the game has a high-quality title image that already shows the name).
+   */
+  hideTitleText?: boolean;
 
   /**
    * Optional YouTube URL(s) to play as looping background audio when the game is selected.

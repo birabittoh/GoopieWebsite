@@ -118,6 +118,12 @@ export function GameStoreProvider({ children }: { children: ReactNode }) {
 
   const getVisibleGames = useCallback((userRole: string | undefined, assignedGames: string[]) => {
     return games.filter(game => {
+      // Unplayable games are only visible to admins and assigned developers.
+      if (game.status === 'Unplayable') {
+        if (userRole === 'admin') return true;
+        if (userRole === 'developer' && assignedGames.includes(game.id)) return true;
+        return false;
+      }
       if (game.isPublic !== false) return true;
       if (userRole === 'admin') return true;
       if (userRole === 'developer' && assignedGames.includes(game.id)) return true;

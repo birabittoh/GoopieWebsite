@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ComponentType } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router';
+import { createHashRouter, Navigate } from 'react-router';
 import { Home } from './pages/Home';
 
 // Lazy-load every route except Home (the landing page) so secondary screens
@@ -12,7 +12,6 @@ const Eula = lazy(() => import('./pages/Eula').then(m => ({ default: m.Eula })))
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy').then(m => ({ default: m.PrivacyPolicy })));
 const SaveManager = lazy(() => import('./pages/SaveManager').then(m => ({ default: m.SaveManager })));
 const Installed = lazy(() => import('./pages/Installed').then(m => ({ default: m.Installed })));
-const Uninstalled = lazy(() => import('./pages/Installed').then(m => ({ default: m.Uninstalled })));
 const News = lazy(() => import('./pages/News').then(m => ({ default: m.News })));
 const Externals = lazy(() => import('./pages/Externals').then(m => ({ default: m.Externals })));
 const Favorites = lazy(() => import('./pages/Favorites').then(m => ({ default: m.Favorites })));
@@ -48,7 +47,7 @@ function withSuspense(Component: ComponentType) {
   };
 }
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: '/',
     Component: RootRoute,
@@ -88,10 +87,6 @@ export const router = createBrowserRouter([
   {
     path: '/installed',
     Component: withSuspense(Installed),
-  },
-  {
-    path: '/uninstalled',
-    Component: withSuspense(Uninstalled),
   },
   {
     path: '/news',

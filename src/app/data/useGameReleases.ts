@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Game } from '../types/game';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 export interface ReleaseAsset {
   name: string;
@@ -19,6 +20,13 @@ export interface InstalledInfo {
   version?: string;
   asset?: string;
   exePath?: string;
+  /** Platform of the installed build's main executable, detected from its
+   *  binary header by the launcher ("Windows" | "Linux" | "macOS"), or
+   *  undefined if unknown (older installs, or detection failed). */
+  platform?: string;
+  /** Architecture of the installed build's main executable (e.g. "x86_64",
+   *  "aarch64"), detected from its binary header, or undefined if unknown. */
+  arch?: string;
 }
 
 /**
@@ -32,6 +40,7 @@ export interface InstalledBuild extends InstalledInfo {
 }
 
 const NIGHTLY_KEY = 'goopie:showNightlies';
+const SHOW_INCOMPATIBLE_KEY = 'goopie:showIncompatibleBuilds';
 const SELECTION_KEY = (gameId: string) => `goopie:gameVersion:${gameId}`;
 const RELEASES_STORAGE_KEY = (repo: string) => `goopie:releases:${repo}`;
 const RELEASES_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -119,6 +128,77 @@ export function pickDefaultAsset(game: Pick<Game, 'recompName' | 'preferredAsset
 }
 
 /**
+ * Best-effort platform guess from a release asset's filename. This mapping is
+ * intentionally *optional* — many builds don't encode the platform in their
+ * name, in which case this returns `undefined` and the asset is treated as
+ * compatible with every platform (never hidden, never penalised in ranking).
+ */
+export function detectAssetPlatform(name: string): 'Windows' | 'Linux' | 'macOS' | undefined {
+  const lower = name.toLowerCase();
+  if (lower.includes('windows') || lower.includes('win32') || lower.includes('win64') || lower.endsWith('.exe')) {
+    return 'Windows';
+  }
+  if (lower.includes('macos') || lower.includes('darwin') || lower.includes('osx') || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
+    return 'macOS';
+  }
+  if (lower.includes('linux') || lower.endsWith('.appimage')) {
+    return 'Linux';
+  }
+  return undefined;
+}
+
+/** Architecture "family" used for cross-arch compatibility checks. */
+type ArchFamily = 'x86' | 'arm' | undefined;
+
+function normalizeArch(arch: string | undefined): { family: ArchFamily; is64: boolean } {
+  switch (arch?.toLowerCase()) {
+    case 'x86_64': case 'amd64': case 'x64':
+      return { family: 'x86', is64: true };
+    case 'x86': case 'i386': case 'i686':
+      return { family: 'x86', is64: false };
+    case 'aarch64': case 'arm64':
+      return { family: 'arm', is64: true };
+    case 'arm':
+      return { family: 'arm', is64: false };
+    default:
+      return { family: undefined, is64: false };
+  }
+}
+
+/**
+ * Whether a build for `buildPlatform` can run on `hostPlatform`. An unknown
+ * value on either side is treated as compatible — we only hide/grey out
+ * builds we're confident won't run.
+ *
+ * When `protonReady` is true, Windows builds are treated as compatible on
+ * Linux (the launcher routes them through Proton transparently).
+ */
+export function isPlatformCompatible(
+  buildPlatform: string | undefined,
+  hostPlatform: string | undefined,
+  protonReady = false,
+): boolean {
+  if (!buildPlatform || !hostPlatform) return true;
+  if (protonReady && hostPlatform === 'Linux' && buildPlatform === 'Windows') return true;
+  return buildPlatform === hostPlatform;
+}
+
+/**
+ * Whether a build for `buildArch` can run on `hostArch`. Unknown values are
+ * treated as compatible. Cross-family (x86 vs arm) is incompatible; within a
+ * family, a narrower build (e.g. 32-bit) runs fine on a wider (64-bit) host,
+ * but not vice versa.
+ */
+export function isArchCompatible(buildArch: string | undefined, hostArch: string | undefined): boolean {
+  if (!buildArch || !hostArch) return true;
+  const build = normalizeArch(buildArch);
+  const host = normalizeArch(hostArch);
+  if (!build.family || !host.family) return true;
+  if (build.family !== host.family) return false;
+  return !build.is64 || host.is64;
+}
+
+/**
  * Returns a stable-sorted copy of `assets` with platform-appropriate artifacts
  * first. All assets are preserved — nothing is filtered out.
  */
@@ -133,18 +213,20 @@ export function sortAssetsByRelevance(assets: ReleaseAsset[], platform?: string,
     const name = a.name.toLowerCase();
     let score = 0;
 
+    const assetPlatform = detectAssetPlatform(a.name);
+    if (isWindows && assetPlatform === 'Windows') score -= 10;
+    if (isLinux && assetPlatform === 'Linux') score -= 10;
+    if (isMac && assetPlatform === 'macOS') score -= 10;
+
     if (isWindows) {
-      if (name.includes('windows') || name.includes('win32') || name.includes('win64')) score -= 10;
       if (name.endsWith('.exe')) score -= 5;
       if (name.endsWith('.zip')) score -= 2;
     }
     if (isLinux) {
-      if (name.includes('linux')) score -= 10;
       if (!name.includes('.')) score -= 5;
       if (name.endsWith('.tar.gz')) score -= 2;
     }
     if (isMac) {
-      if (name.includes('macos') || name.includes('darwin') || name.includes('osx')) score -= 10;
       if (name.endsWith('.dmg') || name.endsWith('.pkg')) score -= 5;
     }
     if (isArm) {
@@ -229,11 +311,15 @@ export async function fetchReleases(repo: string): Promise<GameRelease[]> {
         prerelease: !!r.prerelease,
         publishedAt: r.published_at ?? r.created_at,
         assets: Array.isArray(r.assets)
-          ? r.assets.map((a: any) => ({
-              name: String(a.name ?? ''),
-              url: String(a.browser_download_url ?? ''),
-              size: typeof a.size === 'number' ? a.size : undefined,
-            }))
+          ? r.assets
+              // `.toml` files are launcher config sidecars published alongside
+              // the executable, not runnable builds — never list them.
+              .filter((a: any) => !String(a.name ?? '').toLowerCase().endsWith('.toml'))
+              .map((a: any) => ({
+                name: String(a.name ?? ''),
+                url: String(a.browser_download_url ?? ''),
+                size: typeof a.size === 'number' ? a.size : undefined,
+              }))
           : [],
       }))
       .filter(r => r.tag)
@@ -273,6 +359,16 @@ export function setShowNightliesPersisted(v: boolean) {
   window.localStorage.setItem(NIGHTLY_KEY, v ? '1' : '0');
 }
 
+export function getShowIncompatible(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(SHOW_INCOMPATIBLE_KEY) === '1';
+}
+
+export function setShowIncompatiblePersisted(v: boolean) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(SHOW_INCOMPATIBLE_KEY, v ? '1' : '0');
+}
+
 interface PersistedSelection {
   tag?: string;
   asset?: string;
@@ -309,6 +405,22 @@ export function useGameReleases(game: Game | undefined) {
     if (typeof window === 'undefined') return undefined;
     return (window as any).GetArch?.() as string | undefined;
   }, []);
+  // True when all conditions for Proton-mediated Windows compatibility hold:
+  // Linux host, launcher 1.3.0+, user has Proton enabled, and at least one
+  // Proton installation was detected. When true, Windows builds are treated
+  // as compatible and shown/enabled in the Library (the launcher transparently
+  // routes them through Proton at launch time).
+  const protonReady = useMemo<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    if (platform !== 'Linux') return false;
+    if (!isLauncherVersionAtLeast('1.3.0')) return false;
+    const w = window as any;
+    if (typeof w.getUseProton !== 'function') return false;
+    if (!w.getUseProton()) return false;
+    if (typeof w.getProtonInstallations !== 'function') return false;
+    const installs = w.getProtonInstallations();
+    return Array.isArray(installs) && installs.length > 0;
+  }, [platform]);
   const [releases, setReleases] = useState<GameRelease[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -319,6 +431,13 @@ export function useGameReleases(game: Game | undefined) {
   const setShowNightlies = useCallback((v: boolean) => {
     setShowNightliesState(v);
     setShowNightliesPersisted(v);
+  }, []);
+
+  const [showIncompatible, setShowIncompatibleState] = useState<boolean>(() => getShowIncompatible());
+
+  const setShowIncompatible = useCallback((v: boolean) => {
+    setShowIncompatibleState(v);
+    setShowIncompatiblePersisted(v);
   }, []);
 
   const [selectedTag, setSelectedTagState] = useState<string | undefined>(undefined);
@@ -392,28 +511,53 @@ export function useGameReleases(game: Game | undefined) {
     [selectedRelease, platform, arch],
   );
 
+  // Assets that can actually run on this system, filtered by the (optional)
+  // platform encoded in each asset's filename. Pre-download we only have the
+  // filename to go on, so this is OS-only — architecture mismatches are caught
+  // post-download once the binary itself has been scanned (see `selectedBuild`
+  // compatibility checks in Library.tsx).
+  //
+  // Gated on the launcher version so older launchers (which don't know about
+  // this feature) keep showing every build as before, and on `platform` being
+  // known (i.e. running inside the launcher) — in the browser nothing is hidden.
+  const filterIncompatible = !!platform && isLauncherVersionAtLeast('1.3.0');
+  const compatibleAssets = useMemo(() => {
+    if (!filterIncompatible || showIncompatible) return sortedAssets;
+    return sortedAssets.filter(a => isPlatformCompatible(detectAssetPlatform(a.name), platform, protonReady));
+  }, [sortedAssets, filterIncompatible, showIncompatible, platform, protonReady]);
+
+  // True when every available asset was filtered out as incompatible (and the
+  // "show incompatible" escape hatch hasn't been used) — i.e. nothing on this
+  // page can run on the user's system.
+  const noCompatibleBuilds = filterIncompatible && !showIncompatible
+    && sortedAssets.length > 0 && compatibleAssets.length === 0;
+
   // Resolve the effective selected asset.
   // When a platform is known (i.e. we're inside the launcher), skip the legacy
   // pickDefaultAsset() Windows-first logic and default to the top of the
-  // already platform-sorted sortedAssets list instead.  A game-specific
+  // already platform-sorted compatibleAssets list instead.  A game-specific
   // preferredAssetSuffix still takes precedence when set.  When running in a
   // plain browser (platform undefined), the legacy path is preserved so existing
   // behaviour for web users is unchanged.
   const effectiveAsset = useMemo(() => {
     if (!selectedRelease || !game) return undefined;
-    if (selectedAsset && selectedRelease.assets.some(a => a.name === selectedAsset)) return selectedAsset;
+    // Honour an explicit selection, but only if it's still offered — a
+    // previously-picked asset that's now hidden as incompatible (or that
+    // disappeared from the release) shouldn't stick around as the "selected"
+    // build.
+    if (selectedAsset && compatibleAssets.some(a => a.name === selectedAsset)) return selectedAsset;
     // Honour the explicit per-game preferred suffix first (works for any platform).
     if (game.preferredAssetSuffix) {
       const preferred = `${game.recompName}${game.preferredAssetSuffix}`;
-      const hit = sortedAssets.find(a => a.name.toLowerCase() === preferred.toLowerCase());
+      const hit = compatibleAssets.find(a => a.name.toLowerCase() === preferred.toLowerCase());
       if (hit) return hit.name;
     }
     // When the launcher provides a platform, trust the already-sorted list.
-    if (platform && sortedAssets.length > 0) return sortedAssets[0].name;
+    if (platform && compatibleAssets.length > 0) return compatibleAssets[0].name;
     // Browser / unknown platform: fall back to the legacy helper so the existing
     // behaviour (prefer .exe on Windows, first asset otherwise) is preserved.
-    return pickDefaultAsset(game, sortedAssets);
-  }, [selectedRelease, selectedAsset, game, sortedAssets, platform]);
+    return pickDefaultAsset(game, compatibleAssets);
+  }, [selectedRelease, selectedAsset, game, compatibleAssets, platform]);
 
   const setSelectedTag = useCallback((tag: string | undefined) => {
     setSelectedTagState(tag);
@@ -439,10 +583,15 @@ export function useGameReleases(game: Game | undefined) {
     selectedAsset: effectiveAsset,
     selectedRelease,
     sortedAssets,
+    compatibleAssets,
+    noCompatibleBuilds,
+    showIncompatible,
+    setShowIncompatible,
     setSelectedTag,
     setSelectedAsset,
     platform,
     arch,
+    protonReady,
   };
 }
 

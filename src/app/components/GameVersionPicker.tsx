@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Check, ChevronDown, Package } from 'lucide-react';
 import { Game } from '../types/game';
 import { GameRelease, InstalledInfo, ReleaseAsset } from '../data/useGameReleases';
@@ -8,13 +9,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 interface Props {
   game: Game;
   visibleReleases: GameRelease[];
-  sortedAssets: ReleaseAsset[];
+  /** Assets for the selected release, sorted by relevance and filtered down
+   *  to builds compatible with the current platform/architecture (unless
+   *  `showIncompatible` is on). This is what the Build dropdown offers. */
+  compatibleAssets: ReleaseAsset[];
+  /** True when every asset for the selected release was filtered out as
+   *  incompatible with the current system. */
+  noCompatibleBuilds?: boolean;
+  /** Detected host platform ("Windows" | "Linux" | "macOS"), if known. */
+  platform?: string;
+  /** True when Proton is enabled and a Proton install was detected (Linux). When
+   *  false on Linux, the "no supported builds" message suggests enabling it. */
+  protonReady?: boolean;
   selectedTag: string | undefined;
   selectedAsset: string | undefined;
   setSelectedTag: (tag: string | undefined) => void;
   setSelectedAsset: (asset: string | undefined) => void;
   showNightlies: boolean;
   setShowNightlies: (v: boolean) => void;
+  /** Escape hatch to show builds that don't match the detected platform/arch. */
+  showIncompatible?: boolean;
+  setShowIncompatible?: (v: boolean) => void;
   installed: InstalledInfo | null;
   loading: boolean;
   error: string | null;
@@ -39,13 +54,18 @@ function shortBuildLabel(assetName: string, recompName: string): string {
 export function GameVersionPicker({
   game,
   visibleReleases,
-  sortedAssets,
+  compatibleAssets,
+  noCompatibleBuilds,
+  platform,
+  protonReady,
   selectedTag,
   selectedAsset,
   setSelectedTag,
   setSelectedAsset,
   showNightlies,
   setShowNightlies,
+  showIncompatible,
+  setShowIncompatible,
   installed,
   loading,
   error,
@@ -111,6 +131,33 @@ export function GameVersionPicker({
           </label>
         </div>
 
+        {setShowIncompatible && (
+          <label className="flex items-center gap-1 cursor-pointer select-none text-xs -mt-1">
+            <input
+              type="checkbox"
+              checked={!!showIncompatible}
+              onChange={e => setShowIncompatible(e.target.checked)}
+              style={{ accentColor: 'var(--theme-accent)' }}
+            />
+            <span style={{ color: 'var(--theme-text-secondary)' }}>Show incompatible builds</span>
+          </label>
+        )}
+
+        {noCompatibleBuilds && (
+          <div className="text-xs text-amber-400">
+            There are currently no supported builds for your system{platform ? ` (${platform})` : ''}.
+            {platform === 'Linux' && !protonReady && (
+              <>
+                {' '}Try{' '}
+                <Link to="/settings#proton" className="underline hover:no-underline">
+                  enabling Proton support
+                </Link>
+                {' '}in the launcher settings.
+              </>
+            )}
+          </div>
+        )}
+
         <div className="text-xs space-y-0.5" style={{ color: 'var(--theme-text-muted)' }}>
           <div className="flex items-center gap-1">
             <span>Installed:</span>
@@ -166,13 +213,13 @@ export function GameVersionPicker({
               <Select
                 value={selectedAsset ?? ''}
                 onValueChange={v => setSelectedAsset(v || undefined)}
-                disabled={sortedAssets.length === 0}
+                disabled={compatibleAssets.length === 0}
               >
                 <SelectTrigger size="sm" className="rounded border text-xs" style={selectStyle}>
                   <SelectValue placeholder="No builds" />
                 </SelectTrigger>
                 <SelectContent style={selectStyle}>
-                  {sortedAssets.map(a => (
+                  {compatibleAssets.map(a => (
                     <SelectItem key={a.name} value={a.name}>
                       {shortBuildLabel(a.name, game.recompName)}
                     </SelectItem>

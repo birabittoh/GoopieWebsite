@@ -6,22 +6,26 @@ import { Checkbox } from './ui/checkbox';
 import type { GameRatingInfo } from '../data/useRatings';
 
 const statusColors: Record<Game['status'], string> = {
-  Ingame: 'bg-red-500 text-white',
-  Playable: 'bg-white text-black',
-  Stable: 'bg-green-500 text-white',
+  Featured: 'bg-purple-600 text-white',
   Enhanced: 'bg-blue-500 text-white',
-  External: 'bg-purple-500 text-white',
+  Playable: 'bg-green-700 text-white',
+  Gameplay: 'bg-green-400 text-black',
+  Loads: 'bg-orange-500 text-white',
+  Unplayable: 'bg-red-500 text-white',
+  Unknown: 'bg-gray-600 text-white',
 };
 
 const statusDescriptions: Record<Game['status'], string> = {
-  Ingame: 'Gets in-game but has major issues',
-  Playable: 'Completable with minor issues',
-  Stable: 'Fully playable, no notable issues',
-  Enhanced: 'Stable + mod/quality-of-life improvements',
-  External: 'Playable via an external launcher or service',
+  Featured: 'Creator curated — Enhanced and recommended by the Rexglue team',
+  Enhanced: 'Playable with enhancements like mods or texture packs',
+  Playable: 'Works from start to finish with minor issues',
+  Gameplay: 'Can get into gameplay, completion unknown',
+  Loads: 'Reaches the main menu',
+  Unplayable: 'Crashes too much or has major issues',
+  Unknown: 'Untested',
 };
 
-const ALL_STATUSES: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame', 'External'];
+const ALL_STATUSES: Game['status'][] = ['Featured', 'Enhanced', 'Playable', 'Gameplay', 'Loads', 'Unplayable', 'Unknown'];
 const ALL_PLATFORMS: Platform[] = ['Windows', 'Linux', 'Mac'];
 
 const PlatformIcon = ({ platform, className }: { platform: Platform; className?: string }) => {

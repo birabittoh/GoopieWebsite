@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Check, ArrowLeft, FolderOpen, Globe, Wifi, WifiOff } from 'lucide-react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useTheme, type ThemeName } from '../theme/ThemeContext';
 import { getFpsEnabled, setFpsEnabled } from '../components/FpsCounter';
 import { isInTauriLauncher } from '../utils/externalLink';
-import { getLauncherVersion } from '../utils/launcherVersion';
+import { getLauncherVersion, isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 const languageOptions: { id: number; label: string }[] = [
   { id: 1, label: 'English' },
@@ -39,6 +39,11 @@ const themeOptions: { id: ThemeName; label: string; description: string; preview
   { id: 'toy', label: 'Shapes', description: '', preview: '#ffe4f1' },
 ];
 
+interface ProtonInstall {
+  name: string;
+  path: string;
+}
+
 export function Settings() {
   const { theme, setTheme } = useTheme();
   const [gamesPath, setGamesPath] = useState('');
@@ -48,6 +53,31 @@ export function Settings() {
   const [reachable, setReachable] = useState(true);
   const launcherVersion = getLauncherVersion();
   const w = window as any;
+
+  // Proton state — only populated on Linux launcher 1.3.0+.
+  const isLinuxLauncher =
+    isInTauriLauncher() &&
+    isLauncherVersionAtLeast('1.3.0') &&
+    typeof w.GetPlatform === 'function' &&
+    w.GetPlatform() === 'Linux';
+  const [protonInstalls, setProtonInstalls] = useState<ProtonInstall[]>([]);
+  const [useProton, setUseProton] = useState<boolean>(false);
+  const [selectedProton, setSelectedProton] = useState<string>('');
+
+  // Allow deep-linking to the Proton option (e.g. from the Library's "enable
+  // Proton" hint via /settings#proton): scroll it into view and flash a ring.
+  const location = useLocation();
+  const protonRef = useRef<HTMLElement>(null);
+  const [highlightProton, setHighlightProton] = useState(false);
+  useEffect(() => {
+    if (location.hash !== '#proton' || !isLinuxLauncher) return;
+    const t = setTimeout(() => {
+      protonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setHighlightProton(true);
+      setTimeout(() => setHighlightProton(false), 2000);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [location.hash, isLinuxLauncher]);
 
   useEffect(() => {
     if (w.GetGamesPath) {
@@ -61,6 +91,18 @@ export function Settings() {
     }
     if (typeof w.isOfflineMode === 'function') {
       setOffline(Boolean(w.isOfflineMode()));
+    }
+    if (isLinuxLauncher) {
+      if (typeof w.getProtonInstallations === 'function') {
+        const installs = w.getProtonInstallations();
+        setProtonInstalls(Array.isArray(installs) ? installs : []);
+      }
+      if (typeof w.getUseProton === 'function') {
+        setUseProton(Boolean(w.getUseProton()));
+      }
+      if (typeof w.getSelectedProton === 'function') {
+        setSelectedProton(String(w.getSelectedProton() ?? ''));
+      }
     }
   }, []);
 
@@ -282,14 +324,14 @@ export function Settings() {
           </div>
         </section>
 
-        {/* Online / Offline Mode Section — only meaningful inside the Tauri
+        {/* Offline Mode Section — only meaningful inside the Tauri
             launcher, which injects the isOfflineMode/setOfflineMode bridge
             (the legacy CEF launcher and the plain web build don't). */}
         {isInTauriLauncher() && offline !== null && (
           <section>
-            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Online / Offline Mode</h2>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Offline Mode</h2>
             <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
-              Offline mode keeps the launcher from talking to goopie.xyz at all; no news, ratings or
+              Keeps the launcher from talking to goopie.xyz at all; no news, ratings or
               site content is fetched, and your play sessions aren't logged to your profile.
             </p>
 
@@ -336,6 +378,152 @@ export function Settings() {
                 />
               </button>
             </div>
+          </section>
+        )}
+
+        {/* Proton section — only shown on Linux launcher 1.3.0+ */}
+        {isLinuxLauncher && (
+          <section
+            id="proton"
+            ref={protonRef}
+            className="scroll-mt-4 rounded-xl transition-shadow"
+            style={highlightProton ? { boxShadow: '0 0 0 2px var(--theme-accent)' } : undefined}
+          >
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Proton (Linux)</h2>
+            <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
+              Proton lets you run Windows builds on Linux. Keep in mind, Proton has not been tested with
+              every game and may cause issues with some titles.
+            </p>
+
+            {/* Use Proton toggle */}
+            <div
+              className="rounded-xl border-2 p-5 flex items-center justify-between gap-4"
+              style={{
+                borderColor: 'var(--theme-border)',
+                backgroundColor: 'var(--theme-card-bg)',
+                backdropFilter: 'var(--theme-backdrop-blur)',
+                WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+              }}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                  Use Proton to run Windows builds
+                </div>
+                <div className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+                  Windows builds will appear in the library and launch via Proton.
+                </div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={useProton}
+                onClick={() => {
+                  const next = !useProton;
+                  setUseProton(next);
+                  if (typeof w.setUseProton === 'function') w.setUseProton(next);
+                }}
+                className="shrink-0 relative inline-flex items-center h-7 w-12 rounded-full transition-colors"
+                style={{
+                  backgroundColor: useProton ? 'var(--theme-accent)' : 'var(--theme-item-default)',
+                  border: '1px solid var(--theme-border)',
+                }}
+              >
+                <span
+                  className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
+                  style={{ transform: useProton ? 'translateX(22px)' : 'translateX(3px)' }}
+                />
+              </button>
+            </div>
+
+            {/* Proton installation selector — only when Proton is enabled */}
+            {useProton && (
+              <div
+                className="rounded-xl border-2 p-5 mt-4"
+                style={{
+                  borderColor: 'var(--theme-border)',
+                  backgroundColor: 'var(--theme-card-bg)',
+                  backdropFilter: 'var(--theme-backdrop-blur)',
+                  WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+                }}
+              >
+                <div className="font-semibold mb-3" style={{ color: 'var(--theme-text-primary)' }}>
+                  Proton installation
+                </div>
+                {protonInstalls.length === 0 ? (
+                  <div className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                    No Proton installations found. Install Proton through Steam (or a custom build
+                    like GE-Proton) and reopen the launcher.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* "Automatic" option — use the newest detected installation */}
+                    {(() => {
+                      const isAuto = selectedProton === '';
+                      return (
+                        <button
+                          key="__auto__"
+                          onClick={() => {
+                            setSelectedProton('');
+                            if (typeof w.setSelectedProton === 'function') w.setSelectedProton('');
+                          }}
+                          className="text-left rounded-lg border px-3 py-2 text-sm transition-all"
+                          style={{
+                            borderColor: isAuto ? 'var(--theme-accent)' : 'var(--theme-border)',
+                            backgroundColor: isAuto ? 'var(--theme-item-selected)' : 'transparent',
+                            color: 'var(--theme-text-primary)',
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-medium">Automatic</span>
+                              <div className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
+                                Use the newest detected installation
+                              </div>
+                            </div>
+                            {isAuto && (
+                              <Check className="w-3.5 h-3.5 shrink-0 ml-1" style={{ color: 'var(--theme-accent)' }} />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })()}
+                    {protonInstalls.map(install => {
+                      const selected = selectedProton === install.path;
+                      return (
+                        <button
+                          key={install.path}
+                          onClick={() => {
+                            setSelectedProton(install.path);
+                            if (typeof w.setSelectedProton === 'function') w.setSelectedProton(install.path);
+                          }}
+                          className="text-left rounded-lg border px-3 py-2 text-sm transition-all"
+                          style={{
+                            borderColor: selected ? 'var(--theme-accent)' : 'var(--theme-border)',
+                            backgroundColor: selected ? 'var(--theme-item-selected)' : 'transparent',
+                            color: 'var(--theme-text-primary)',
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0">
+                              <span className="font-medium">{install.name}</span>
+                              <div
+                                className="text-xs mt-0.5 truncate"
+                                style={{ color: 'var(--theme-text-muted)' }}
+                                title={install.path}
+                              >
+                                {install.path}
+                              </div>
+                            </div>
+                            {selected && (
+                              <Check className="w-3.5 h-3.5 shrink-0 ml-1" style={{ color: 'var(--theme-accent)' }} />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 

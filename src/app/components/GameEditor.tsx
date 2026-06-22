@@ -18,7 +18,7 @@ interface GameEditorProps {
   readOnly?: boolean;
 }
 
-const statusOptions: Game['status'][] = ['Enhanced', 'Stable', 'Playable', 'Ingame', 'External'];
+const statusOptions: Game['status'][] = ['Featured', 'Enhanced', 'Playable', 'Gameplay', 'Loads', 'Unplayable', 'Unknown'];
 const ALL_PLATFORMS: Platform[] = ['Windows', 'Linux', 'Mac'];
 
 export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }: GameEditorProps) {
@@ -33,7 +33,7 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
     og_developer: '',
     recompiled_developers: [],
     Tags: [],
-    status: 'Ingame',
+    status: 'Unknown',
     coverImage: '',
     headerImage: [],
     description: '',
@@ -258,6 +258,19 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
                 />
           </div>
 
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="hideTitleText"
+              checked={!!form.hideTitleText}
+              onChange={e => update('hideTitleText', e.target.checked || undefined)}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <label htmlFor="hideTitleText" className={labelClass} style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer' }}>
+              Hide title text on Library page (use when title image already shows the game name)
+            </label>
+          </div>
+
 
           {/* Accent Color */}
           <div>
@@ -387,6 +400,15 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
                   />
                 </div>
               ))}
+            </div>
+            <div className="mt-3">
+              <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>Discord Guild ID <span className="opacity-60">(for embedded widget — right-click server icon → Copy Server ID)</span></label>
+              <Input
+                value={form.discordGuildId || ''}
+                onChange={e => update('discordGuildId', e.target.value || undefined)}
+                placeholder="e.g. 1513356298874388640"
+                style={inputStyle}
+              />
             </div>
           </div>
 

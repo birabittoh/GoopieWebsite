@@ -45,6 +45,16 @@ export interface DeveloperRequest {
   createdAt: string;
 }
 
+export interface DeletionRequest {
+  id: string;
+  uid: string;
+  username: string;
+  email: string;
+  picture?: string;
+  reason: string;
+  createdAt: string;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -61,6 +71,10 @@ interface AuthContextType {
   approveDeveloperRequest: (requestId: string, uid: string) => Promise<string>;
   denyDeveloperRequest: (requestId: string) => Promise<string>;
   deleteUser: (uid: string) => Promise<string>;
+  submitDeletionRequest: (reason: string) => Promise<string>;
+  getDeletionRequests: () => Promise<DeletionRequest[]>;
+  approveDeletionRequest: (requestId: string, uid: string) => Promise<string>;
+  denyDeletionRequest: (requestId: string) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -338,14 +352,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await deleteDoc(doc(db, 'users', uid));
       // Also clean up any pending developer request for this user
       try { await deleteDoc(doc(db, 'developerRequests', uid)); } catch { /* ignore */ }
+      // Also clean up any pending deletion request for this user
+      try { await deleteDoc(doc(db, 'deletionRequests', uid)); } catch { /* ignore */ }
       return 'ok';
     } catch {
       return 'Failed to delete user';
     }
   };
 
+  const submitDeletionRequest = async (reason: string): Promise<string> => {
+    if (!user) return 'Not logged in';
+    try {
+      const reqRef = doc(db, 'deletionRequests', user.uid);
+      const existing = await getDoc(reqRef);
+      if (existing.exists()) return 'You already have a pending request';
+      await setDoc(reqRef, {
+        uid: user.uid,
+        username: user.username,
+        email: user.email,
+        picture: user.picture || '',
+        reason,
+        createdAt: new Date().toISOString(),
+      });
+      return 'ok';
+    } catch (err) {
+      console.error('Deletion request failed:', err);
+      return 'Failed to submit request';
+    }
+  };
+
+  const getDeletionRequests = async (): Promise<DeletionRequest[]> => {
+    if (!user || user.role !== 'admin') return [];
+    try {
+      const snap = await getDocs(collection(db, 'deletionRequests'));
+      return snap.docs.map(d => ({ id: d.id, ...d.data() } as DeletionRequest));
+    } catch (err) {
+      console.error('Failed to fetch deletion requests:', err);
+      return [];
+    }
+  };
+
+  const approveDeletionRequest = async (requestId: string, uid: string): Promise<string> => {
+    if (!user || user.role !== 'admin') return 'Permission denied';
+    try {
+      await deleteDoc(doc(db, 'deletionRequests', requestId));
+      await deleteUser(uid);
+      return 'ok';
+    } catch {
+      return 'Failed to approve deletion request';
+    }
+  };
+
+  const denyDeletionRequest = async (requestId: string): Promise<string> => {
+    if (!user || user.role !== 'admin') return 'Permission denied';
+    try {
+      await deleteDoc(doc(db, 'deletionRequests', requestId));
+      return 'ok';
+    } catch {
+      return 'Failed to deny deletion request';
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Game } from '../types/game';
-import { useAuth, type Role, type DeveloperRequest } from '../auth/AuthContext';
+import { useAuth, type Role, type DeveloperRequest, type DeletionRequest } from '../auth/AuthContext';
 import { useGameStore } from '../data/GameStore';
 
 const statusColors: Record<Game['status'], string> = {
@@ -18,7 +18,7 @@ const statusColors: Record<Game['status'], string> = {
 };
 
 export function Profile() {
-  const { user, logout, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser } = useAuth();
+  const { user, logout, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest } = useAuth();
   const { games, saveGame } = useGameStore();
   const navigate = useNavigate();
   const [allUsers, setAllUsers] = useState<{ uid: string; username: string; email: string; role: Role; assignedGames: string[]; picture?: string }[]>([]);
@@ -28,6 +28,10 @@ export function Profile() {
   const [devRequestStatus, setDevRequestStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'already'>('idle');
   const [devRequests, setDevRequests] = useState<DeveloperRequest[]>([]);
   const [deleteConfirmUid, setDeleteConfirmUid] = useState<string | null>(null);
+  const [deletionRequestOpen, setDeletionRequestOpen] = useState(false);
+  const [deletionRequestReason, setDeletionRequestReason] = useState('');
+  const [deletionRequestStatus, setDeletionRequestStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'already'>('idle');
+  const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
 
   const totalGames = games.length;
 
@@ -44,6 +48,7 @@ export function Profile() {
     if (canSetRoles()) {
       getAllUsers().then(setAllUsers);
       getDeveloperRequests().then(setDevRequests);
+      getDeletionRequests().then(setDeletionRequests);
     }
   };
 
@@ -128,16 +133,26 @@ export function Profile() {
                 )}
               </div>
               <p style={{ color: 'var(--theme-text-muted)' }} className="mb-4">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Unknown'}</p>
-              {user?.role === 'user' && (
+              <div className="flex flex-wrap gap-3">
+                {user?.role === 'user' && (
+                  <Button
+                    onClick={() => { setDevRequestOpen(true); setDevRequestStatus('idle'); setDevRequestMessage(''); }}
+                    className="text-white"
+                    style={{ backgroundColor: 'var(--theme-item-selected)' }}
+                  >
+                    <Code className="w-4 h-4 mr-2" />
+                    Request Developer Access
+                  </Button>
+                )}
                 <Button
-                  onClick={() => { setDevRequestOpen(true); setDevRequestStatus('idle'); setDevRequestMessage(''); }}
-                  className="text-white"
-                  style={{ backgroundColor: 'var(--theme-item-selected)' }}
+                  onClick={() => { setDeletionRequestOpen(true); setDeletionRequestStatus('idle'); setDeletionRequestReason(''); }}
+                  variant="outline"
+                  className="border-red-600 text-red-500 hover:bg-red-600 hover:text-white"
                 >
-                  <Code className="w-4 h-4 mr-2" />
-                  Request Developer Access
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Request Account Deletion
                 </Button>
-              )}
+              </div>
               <div className="flex gap-6">
                 <div>
                   
@@ -146,6 +161,62 @@ export function Profile() {
             </div>
           </div>
         </div>
+
+        {/* Account Deletion Requests (Admin) */}
+        {canSetRoles() && deletionRequests.length > 0 && (
+          <div className="rounded-lg p-8 mt-8" style={{ backgroundColor: 'var(--theme-card-bg)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
+            <h3 className="text-2xl font-bold mb-6 flex items-center gap-3" style={{ color: 'var(--theme-text-primary)' }}>
+              <Trash2 className="w-6 h-6 text-red-500" />
+              Account Deletion Requests ({deletionRequests.length})
+            </h3>
+            <div className="space-y-4">
+              {deletionRequests.map(req => (
+                <div key={req.id} className="rounded-lg p-4" style={{ backgroundColor: 'var(--theme-page-bg)' }}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {req.picture ? (
+                        <img src={req.picture} alt={req.username} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))' }}>
+                          <span className="text-lg font-bold text-white">{req.username[0]?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>{req.username}</span>
+                        <span className="text-xs ml-2" style={{ color: 'var(--theme-text-muted)' }}>{req.email}</span>
+                        <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+                          {new Date(req.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={async () => { await approveDeletionRequest(req.id, req.uid); refreshUsers(); }}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete Account
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={async () => { await denyDeletionRequest(req.id); refreshUsers(); }}
+                        className="text-white"
+                        style={{ backgroundColor: 'var(--theme-item-selected)' }}
+                      >
+                        <XCircle className="w-4 h-4 mr-1" /> Deny
+                      </Button>
+                    </div>
+                  </div>
+                  {req.reason && (
+                    <div className="rounded-md p-3 mt-2" style={{ backgroundColor: 'var(--theme-card-bg)' }}>
+                      <p className="text-sm italic" style={{ color: 'var(--theme-text-primary)' }}>"{req.reason}"</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Developer Access Requests (Admin) */}
         {canSetRoles() && devRequests.length > 0 && (
@@ -356,6 +427,62 @@ export function Profile() {
           </div>
         )}
       </div>
+
+      {/* Request Account Deletion Dialog */}
+      <Dialog open={deletionRequestOpen} onOpenChange={setDeletionRequestOpen}>
+        <DialogContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)' }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Request Account Deletion</DialogTitle>
+            <DialogDescription style={{ color: 'var(--theme-text-muted)' }}>
+              Your request will be reviewed by an admin before your account is permanently deleted. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deletionRequestStatus === 'sent' ? (
+            <div className="py-4 text-center">
+              <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
+              <p style={{ color: 'var(--theme-text-primary)' }}>Your deletion request has been submitted.</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--theme-text-muted)' }}>An admin will review it soon.</p>
+            </div>
+          ) : deletionRequestStatus === 'already' ? (
+            <div className="py-4 text-center">
+              <Clock className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
+              <p style={{ color: 'var(--theme-text-primary)' }}>You already have a pending deletion request.</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--theme-text-muted)' }}>Please wait for an admin to review it.</p>
+            </div>
+          ) : (
+            <>
+              <Textarea
+                value={deletionRequestReason}
+                onChange={e => setDeletionRequestReason(e.target.value)}
+                placeholder="Optional: tell us why you'd like your account deleted."
+                rows={3}
+                style={{ backgroundColor: 'var(--theme-page-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+              />
+              {deletionRequestStatus === 'error' && (
+                <p className="text-sm text-red-500">Failed to submit request. Please try again.</p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeletionRequestOpen(false)} style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)', backgroundColor: 'transparent' }}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={deletionRequestStatus === 'sending'}
+                  onClick={async () => {
+                    setDeletionRequestStatus('sending');
+                    const result = await submitDeletionRequest(deletionRequestReason.trim());
+                    if (result === 'ok') setDeletionRequestStatus('sent');
+                    else if (result === 'You already have a pending request') setDeletionRequestStatus('already');
+                    else setDeletionRequestStatus('error');
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {deletionRequestStatus === 'sending' ? 'Submitting...' : 'Submit Request'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Request Developer Access Dialog */}
       <Dialog open={devRequestOpen} onOpenChange={setDevRequestOpen}>

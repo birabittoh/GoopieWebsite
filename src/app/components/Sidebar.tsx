@@ -3,7 +3,6 @@ import {
   Home as HomeIcon,
   Library as LibraryIcon,
   Download,
-  PackageX,
   Newspaper,
   ExternalLink,
   Star,
@@ -26,7 +25,6 @@ const baseItems: SidebarItem[] = [
   { to: '/', label: 'Home', Icon: HomeIcon },
   { to: '/library', label: 'Library', Icon: LibraryIcon },
   { to: '/installed', label: 'Installed', Icon: Download },
-  { to: '/uninstalled', label: 'Uninstalled', Icon: PackageX },
   { to: '/externals', label: 'External Games', Icon: ExternalLink },
   { to: '/favorites', label: 'Favorites', Icon: Star },
   { to: '/news', label: 'News', Icon: Newspaper },
@@ -67,13 +65,6 @@ export function Sidebar() {
     return visibleGames.filter((g: Game) => !!w.isIsoInstalled(g.recompName)).length;
   }, [visibleGames, isInCEF]);
 
-  const uninstalledCount = useMemo(() => {
-    const w = window as any;
-    const isInstalled = (g: Game) =>
-      typeof w.isIsoInstalled === 'function' ? !!w.isIsoInstalled(g.recompName) : false;
-    return visibleGames.filter(g => !isInstalled(g)).length;
-  }, [visibleGames, isInCEF]);
-
   const externalsCount = useMemo(
     () => visibleGames.filter(g => !!g.externalLauncherUrl).length,
     [visibleGames],
@@ -92,8 +83,6 @@ export function Sidebar() {
       switch (item.to) {
         case '/installed':
           return installedCount > 0;
-        case '/uninstalled':
-          return uninstalledCount > 0;
         case '/externals':
           return externalsCount > 0;
         case '/favorites':
@@ -104,7 +93,7 @@ export function Sidebar() {
           return true;
       }
     });
-  }, [installedCount, uninstalledCount, externalsCount, favoritesCount, newsCount, isDevOrAdmin]);
+  }, [installedCount, externalsCount, favoritesCount, newsCount, isDevOrAdmin]);
 
   return (
     <aside
