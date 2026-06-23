@@ -74,10 +74,28 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const handleInstallAssetPick = useCallback(() => {
     const w = window as any;
     if (w.InstallAssetPick) {
-      w.InstallAssetPick(game.recompName, game.updateChecksum || '', JSON.stringify(dlcNames));
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames);
       setExtracting(true);
     }
   }, [game.recompName, game.updateChecksum, dlcNames]);
+
+  const handleFileDrop = useCallback((paths: string[]) => {
+    const w = window as any;
+    if (w.InstallAssetFiles && paths.length > 0) {
+      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames);
+      setExtracting(true);
+    }
+  }, [game.recompName, game.updateChecksum, dlcNames]);
+
+  useEffect(() => {
+    if (!open || !showAssetsTab) return;
+    const onFileDrop = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.paths) handleFileDrop(detail.paths);
+    };
+    window.addEventListener('goopie:filedrop', onFileDrop);
+    return () => window.removeEventListener('goopie:filedrop', onFileDrop);
+  }, [open, showAssetsTab, handleFileDrop]);
 
   const handleRemoveUpdate = useCallback(() => {
     setConfirmAction({
