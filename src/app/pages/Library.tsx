@@ -469,6 +469,7 @@ export function Library() {
     onSwitchToInstalledBuild: switchToInstalledBuild,
     onOpenManage: isLauncherVersionAtLeast('1.4.0') || !selectedGame.disableSaveManager ? () => setShowManageModal(true) : undefined,
     updateInstalled: installation.updateInstalled,
+    dlcInstalled: installation.dlcInstalled,
     versionPicker: versionPickerProps,
   } : null;
 

@@ -46,6 +46,7 @@ export interface GameActionButtonsProps {
   onSwitchToInstalledBuild: (build: InstalledBuild) => void;
   onOpenManage?: () => void;
   updateInstalled?: boolean;
+  dlcInstalled?: boolean;
 
   // Version picker props
   versionPicker: {
@@ -102,6 +103,7 @@ export function GameActionButtons({
   onSwitchToInstalledBuild,
   onOpenManage,
   updateInstalled,
+  dlcInstalled,
   versionPicker,
 }: GameActionButtonsProps) {
   const btnPx = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg';
@@ -132,7 +134,7 @@ export function GameActionButtons({
   return (
     <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)] mb-4'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
       {extracting ? (
-        <div className={compact ? 'flex items-center gap-2' : 'w-full max-w-md'}>
+        <div className="flex items-center gap-2">
           <RefreshCw className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} animate-spin`} style={{ color: 'var(--theme-accent)' }} />
           <span className={`font-semibold ${compact ? 'text-sm' : ''}`} style={{ color: 'var(--theme-text-primary)' }}>Extracting...</span>
         </div>
@@ -214,9 +216,18 @@ export function GameActionButtons({
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={() => onRemoveBuild(selectedBuild)}>
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
               </Button>
-            ) : installedBuilds.length === 0 && isoInstalled && (
+            ) : installedBuilds.length === 0 && isoInstalled && !updateInstalled && !dlcInstalled && (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={onRemoveAssets}>
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Remove assets
+              </Button>
+            )}
+            {onOpenManage && (
+              <Button
+                className={`text-white ${btnPxSm}`}
+                style={{ backgroundColor: 'var(--theme-accent)' }}
+                onClick={onOpenManage}
+              >
+                <Settings2 className={`${iconSize} ${iconMr}`} /> Manage
               </Button>
             )}
           </div>

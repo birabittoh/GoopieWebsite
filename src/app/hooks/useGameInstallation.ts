@@ -27,6 +27,7 @@ export function useGameInstallation({
   const [extractError, setExtractError] = useState<string | null>(null);
   const [installedBuilds, setInstalledBuilds] = useState<InstalledBuild[]>([]);
   const [updateInstalled, setUpdateInstalled] = useState(false);
+  const [dlcInstalled, setDlcInstalled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const steadyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -34,8 +35,12 @@ export function useGameInstallation({
     const w = window as any;
     if (selectedGame) {
       setIsoInstalled(w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false);
-      if (isLauncherVersionAtLeast('1.4.0') && w.isUpdateInstalled) {
-        setUpdateInstalled(w.isUpdateInstalled(selectedGame.recompName));
+      if (isLauncherVersionAtLeast('1.4.0')) {
+        if (w.isUpdateInstalled) setUpdateInstalled(w.isUpdateInstalled(selectedGame.recompName));
+        if (w.getInstalledDlc) {
+          const dlc = w.getInstalledDlc(selectedGame.recompName);
+          setDlcInstalled(Array.isArray(dlc) && dlc.length > 0);
+        }
       }
       const builds = readInstalledBuilds(selectedGame.recompName);
       setInstalledBuilds(builds);
@@ -156,6 +161,7 @@ export function useGameInstallation({
     clearExtractError,
     installedBuilds,
     updateInstalled,
+    dlcInstalled,
     checkState,
     handleInstallIso,
     setUpdating: setUpdatingState,
