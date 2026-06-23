@@ -45,11 +45,13 @@ export function InstalledFilterPage({ mode, title, subtitle, emptyMessage }: Ins
       typeof w.isIsoInstalled === 'function' ? !!w.isIsoInstalled(g.recompName) : false;
 
     const statusOrder: Record<Game['status'], number> = {
-      Enhanced: 0,
-      Stable: 1,
+      Featured: 0,
+      Enhanced: 1,
       Playable: 2,
-      Ingame: 3,
-      External: 4,
+      Gameplay: 3,
+      Loads: 4,
+      Unplayable: 5,
+      Unknown: 6,
     };
 
     return visibleGames

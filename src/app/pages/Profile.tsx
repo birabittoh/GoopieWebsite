@@ -10,11 +10,13 @@ import { useAuth, type Role, type DeveloperRequest, type DeletionRequest } from 
 import { useGameStore } from '../data/GameStore';
 
 const statusColors: Record<Game['status'], string> = {
-  Ingame: 'bg-red-500 text-white',
-  Stable: 'bg-green-500 text-white',
-  Playable: 'bg-white text-black',
+  Featured: 'bg-purple-600 text-white',
   Enhanced: 'bg-blue-500 text-white',
-  External: 'bg-orange-500 text-white',
+  Playable: 'bg-green-700 text-white',
+  Gameplay: 'bg-green-400 text-black',
+  Loads: 'bg-orange-500 text-white',
+  Unplayable: 'bg-red-500 text-white',
+  Unknown: 'bg-gray-600 text-white',
 };
 
 export function Profile() {
