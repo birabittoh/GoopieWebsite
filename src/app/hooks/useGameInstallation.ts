@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Game } from '../types/game';
 import { readInstalledBuilds, findInstalledBuild, type InstalledBuild } from '../data/useGameReleases';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface UseGameInstallationOptions {
   selectedGame: Game | undefined;
@@ -23,6 +24,7 @@ export function useGameInstallation({
   const [extracting, setExtracting] = useState(false);
   const [extractProgress, setExtractProgress] = useState(0);
   const [extractString, setExtractString] = useState('');
+  const [extractError, setExtractError] = useState<string | null>(null);
   const [installedBuilds, setInstalledBuilds] = useState<InstalledBuild[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const steadyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -77,6 +79,10 @@ export function useGameInstallation({
             setExtractString(w.getExtractString ? w.getExtractString(selectedGame.id) : 'Extracting...');
           } else {
             setIsoInstalled(w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false);
+            if (isLauncherVersionAtLeast('1.3.1')) {
+              const err = w.getExtractError ? w.getExtractError() : null;
+              if (err) setExtractError(err);
+            }
           }
         }
       }, 500);
@@ -125,6 +131,14 @@ export function useGameInstallation({
     }
   }, []);
 
+  const clearExtractError = useCallback(() => {
+    setExtractError(null);
+    const w = window as any;
+    if (isLauncherVersionAtLeast('1.3.1') && w.clearExtractError) {
+      w.clearExtractError();
+    }
+  }, []);
+
   return {
     isoInstalled,
     exeUpdated,
@@ -134,6 +148,8 @@ export function useGameInstallation({
     extracting,
     extractProgress,
     extractString,
+    extractError,
+    clearExtractError,
     installedBuilds,
     checkState,
     handleInstallIso,

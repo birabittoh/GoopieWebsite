@@ -31,6 +31,7 @@ import { LibraryBanners } from '../components/LibraryBanners';
 import { GameDetailHeader } from '../components/GameDetailHeader';
 import { GameMediaCarousel } from '../components/GameMediaCarousel';
 import { ConfirmCloseGameDialog } from '../components/ConfirmCloseGameDialog';
+import { ExtractErrorDialog } from '../components/ExtractErrorDialog';
 
 export function Library() {
   const { recompName: urlRecompName } = useParams<{ recompName: string }>();
@@ -657,6 +658,11 @@ export function Library() {
         runningGame={runningGameHook.runningGame}
         onCancel={() => runningGameHook.setPendingPlayBuild(null)}
         onConfirm={runningGameHook.confirmCloseAndPlay}
+      />
+
+      <ExtractErrorDialog
+        error={installation.extractError}
+        onClose={installation.clearExtractError}
       />
     </div>
   );
