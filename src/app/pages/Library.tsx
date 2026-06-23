@@ -377,6 +377,10 @@ export function Library() {
     return buildReleaseDownloadPrefix(githubRepo, selectedTag);
   }, [githubRepo, selectedTag, selectedGame?.githubReleaseUrl]);
 
+  // True when the game has a release source configured (GitHub repo or a
+  // hardcoded release URL).  Without one, Install / Update must be hidden.
+  const canInstall = !!(githubRepo || selectedGame?.githubReleaseUrl);
+
   // With per-build directories, picking a tag/asset that isn't installed no
   // longer means "needs an update" -- it means "install this as a new,
   // separate build". `selectionMismatch` now flags exactly that: the user has
@@ -1155,7 +1159,7 @@ export function Library() {
                                 {incompatibleBuildReason}
                               </p>
                             )}
-                            {(selectionMismatch || newerReleaseAvailable) && (
+                            {canInstall && (selectionMismatch || newerReleaseAvailable) && (
                               <Button
                                 className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg"
                                 onClick={triggerUpdate}
@@ -1211,7 +1215,7 @@ export function Library() {
                              either way the action installs it into its own build dir
                              without touching any other installed build. */
                           <div className="flex flex-wrap gap-3">
-                            {noCompatibleBuilds && !selectedBuild ? (
+                            {!canInstall ? null : (noCompatibleBuilds && !selectedBuild) ? (
                               noSupportedBuildsNotice
                             ) : (
                               <Button
@@ -1511,7 +1515,7 @@ export function Library() {
                               {incompatibleBuildReason}
                             </p>
                           )}
-                          {(selectionMismatch || newerReleaseAvailable) && (
+                          {canInstall && (selectionMismatch || newerReleaseAvailable) && (
                             <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
                               <Download className="w-4 h-4 mr-1" /> {selectedBuild ? 'Update' : 'Install'}
                             </Button>
@@ -1545,7 +1549,7 @@ export function Library() {
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
-                          {noCompatibleBuilds && !selectedBuild ? (
+                          {!canInstall ? null : (noCompatibleBuilds && !selectedBuild) ? (
                             noSupportedBuildsNotice
                           ) : (
                             <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white px-4 py-2 text-sm" onClick={triggerUpdate}>
