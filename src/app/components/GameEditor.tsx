@@ -42,6 +42,8 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
     mediaLinks: [],
     platforms: ['Windows'],
     setGameDataRootToAssets: true,
+    updateStatus: 'hidden',
+    dlcNames: [],
   });
 
   const [devInput, setDevInput] = useState('');
@@ -49,6 +51,7 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
   const [mediaInput, setMediaInput] = useState('');
   const [headerImageInput, setHeaderImageInput] = useState('');
   const [audioInput, setAudioInput] = useState('');
+  const [dlcNameInput, setDlcNameInput] = useState('');
 
   // Normalize headerImage to always be an array internally
   const headerImages: string[] = Array.isArray(form.headerImage) ? form.headerImage : (form.headerImage ? [form.headerImage] : []);
@@ -650,6 +653,57 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
             </div>
             <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
               Identifies the exact XEX revision the recomp expects.
+            </p>
+          </div>
+
+          {/* Update & DLC */}
+          <div>
+            <label className={`${labelClass} mb-3`} style={labelStyle}>Update &amp; DLC</label>
+            <div className="grid grid-cols-2 gap-4 mb-3">
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>Update Status</label>
+                <Select value={form.updateStatus || 'hidden'} onValueChange={v => update('updateStatus', v as Game['updateStatus'])}>
+                  <SelectTrigger className="w-full rounded-md text-sm border" style={inputStyle}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent style={inputStyle}>
+                    <SelectItem value="hidden">Hidden</SelectItem>
+                    <SelectItem value="optional">Optional</SelectItem>
+                    <SelectItem value="required">Required</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>Update Checksum (SHA-256)</label>
+                <Input
+                  value={form.updateChecksum || ''}
+                  onChange={e => update('updateChecksum', e.target.value || undefined)}
+                  placeholder="e.g. a1b2c3..."
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>DLC Names</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(form.dlcNames || []).map((name, i) => (
+                  <span key={i} className="px-3 py-1 rounded text-xs flex items-center gap-1" style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-accent)' }}>
+                    {name}
+                    <button type="button" onClick={() => update('dlcNames', (form.dlcNames || []).filter((_, j) => j !== i))} className="hover:text-red-400"><X className="w-3 h-3" /></button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input value={dlcNameInput} onChange={e => setDlcNameInput(e.target.value)} placeholder="Add DLC name" className="flex-1" style={inputStyle}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); if (dlcNameInput.trim()) { update('dlcNames', [...(form.dlcNames || []), dlcNameInput.trim()]); setDlcNameInput(''); }}}} />
+                <Button type="button" size="sm" className="text-white" style={{ backgroundColor: 'var(--theme-item-selected)' }}
+                  onClick={() => { if (dlcNameInput.trim()) { update('dlcNames', [...(form.dlcNames || []), dlcNameInput.trim()]); setDlcNameInput(''); }}}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+              Known DLC display names. Matched against STFS package headers when players install DLC files.
             </p>
           </div>
 

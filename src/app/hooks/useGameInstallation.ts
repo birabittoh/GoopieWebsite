@@ -26,6 +26,7 @@ export function useGameInstallation({
   const [extractString, setExtractString] = useState('');
   const [extractError, setExtractError] = useState<string | null>(null);
   const [installedBuilds, setInstalledBuilds] = useState<InstalledBuild[]>([]);
+  const [updateInstalled, setUpdateInstalled] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const steadyPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -33,6 +34,9 @@ export function useGameInstallation({
     const w = window as any;
     if (selectedGame) {
       setIsoInstalled(w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false);
+      if (isLauncherVersionAtLeast('1.4.0') && w.isUpdateInstalled) {
+        setUpdateInstalled(w.isUpdateInstalled(selectedGame.recompName));
+      }
       const builds = readInstalledBuilds(selectedGame.recompName);
       setInstalledBuilds(builds);
       const matching = findInstalledBuild(builds, selectedTag, selectedAsset);
@@ -151,6 +155,7 @@ export function useGameInstallation({
     extractError,
     clearExtractError,
     installedBuilds,
+    updateInstalled,
     checkState,
     handleInstallIso,
     setUpdating: setUpdatingState,

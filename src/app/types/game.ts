@@ -103,6 +103,24 @@ export interface Game {
   disableSaveManager?: boolean;
 
   /**
+   * Whether a title update is required, optional, or hidden for this game.
+   * Missing = 'hidden' for backwards compatibility.
+   */
+  updateStatus?: 'required' | 'optional' | 'hidden';
+
+  /**
+   * SHA-256 hash of the raw title update STFS file. When non-empty, the
+   * launcher verifies the dropped/browsed file against this before installing.
+   */
+  updateChecksum?: string;
+
+  /**
+   * Known DLC display names for this game. Used to match installed DLC
+   * packages by their STFS display name header.
+   */
+  dlcNames?: string[];
+
+  /**
    * Configurable cvars exposed to the player as a settings panel on the
    * game page. Their values are appended as `-tag value` pairs to the
    * launch command passed to the launcher.

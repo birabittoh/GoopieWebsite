@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router';
-import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Save } from 'lucide-react';
+import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { GameVersionPicker } from './GameVersionPicker';
@@ -45,6 +44,8 @@ export interface GameActionButtonsProps {
   onRemoveBuild: (build: InstalledBuild) => void;
   onRemoveAssets: () => void;
   onSwitchToInstalledBuild: (build: InstalledBuild) => void;
+  onOpenManage?: () => void;
+  updateInstalled?: boolean;
 
   // Version picker props
   versionPicker: {
@@ -99,10 +100,10 @@ export function GameActionButtons({
   onRemoveBuild,
   onRemoveAssets,
   onSwitchToInstalledBuild,
+  onOpenManage,
+  updateInstalled,
   versionPicker,
 }: GameActionButtonsProps) {
-  const navigate = useNavigate();
-
   const btnPx = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg';
   const btnPxSm = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg';
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5';
@@ -147,7 +148,12 @@ export function GameActionButtons({
           </div>
         ) : exeUpdated ? (
           <div className={`flex flex-wrap gap-${compact ? '2' : '3'}`}>
-            {isSelectedBuildRunning ? (
+            {game.updateStatus === 'required' && !updateInstalled ? (
+              <p className={`${compact ? 'text-xs' : 'text-sm'} flex items-center gap-1`} style={{ color: 'var(--theme-text-muted)' }}>
+                <AlertTriangle className="w-4 h-4 text-yellow-500" />
+                Title update required.{onOpenManage && <button onClick={onOpenManage} className="underline hover:no-underline ml-1" style={{ color: 'var(--theme-accent)' }}>Install it in Manage.</button>}
+              </p>
+            ) : isSelectedBuildRunning ? (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPx}`} onClick={onCloseRunningGame}>
                 <X className={`${iconSize} ${iconMr}`} /> Close
               </Button>
@@ -185,13 +191,13 @@ export function GameActionButtons({
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
               </Button>
             )}
-            {!game.disableSaveManager && (
+            {onOpenManage && (
               <Button
                 className={`text-white ${btnPxSm}`}
                 style={{ backgroundColor: 'var(--theme-accent)' }}
-                onClick={() => navigate(`/${game.recompName}/saves`)}
+                onClick={onOpenManage}
               >
-                <Save className={`${iconSize} ${iconMr}`} /> {compact ? 'Saves' : 'Manage Saves'}
+                <Settings2 className={`${iconSize} ${iconMr}`} /> Manage
               </Button>
             )}
           </div>
@@ -220,7 +226,7 @@ export function GameActionButtons({
           className={`bg-[#da5d09] hover:bg-[#f18339] text-white ${btnPx}`}
           onClick={onInstallIso}
         >
-          <FolderOpen className={`${iconSize} ${iconMr}`} /> Select Game Iso
+          <FolderOpen className={`${iconSize} ${iconMr}`} /> Select Game
         </Button>
       )}
       {isoInstalled && !extracting && !updating && (

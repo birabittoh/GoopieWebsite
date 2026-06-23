@@ -32,6 +32,7 @@ import { GameDetailHeader } from '../components/GameDetailHeader';
 import { GameMediaCarousel } from '../components/GameMediaCarousel';
 import { ConfirmCloseGameDialog } from '../components/ConfirmCloseGameDialog';
 import { ExtractErrorDialog } from '../components/ExtractErrorDialog';
+import { GameManageModal } from '../components/GameManageModal';
 
 export function Library() {
   const { recompName: urlRecompName } = useParams<{ recompName: string }>();
@@ -69,6 +70,7 @@ export function Library() {
   });
   const [editingDescription, setEditingDescription] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
   const appliedUrlRef = useMemo(() => ({ current: undefined as string | undefined }), []);
 
   const visibleGames = useMemo(() => {
@@ -465,6 +467,8 @@ export function Library() {
     onRemoveBuild: removeBuild,
     onRemoveAssets: removeAssets,
     onSwitchToInstalledBuild: switchToInstalledBuild,
+    onOpenManage: isLauncherVersionAtLeast('1.4.0') || !selectedGame.disableSaveManager ? () => setShowManageModal(true) : undefined,
+    updateInstalled: installation.updateInstalled,
     versionPicker: versionPickerProps,
   } : null;
 
@@ -664,6 +668,16 @@ export function Library() {
         error={installation.extractError}
         onClose={installation.clearExtractError}
       />
+
+      {selectedGame && showManageModal && (
+        <GameManageModal
+          game={selectedGame}
+          open={showManageModal}
+          onClose={() => setShowManageModal(false)}
+          canEdit={canEditGame(selectedGame.id)}
+          onSaveGame={saveGame}
+        />
+      )}
     </div>
   );
 }

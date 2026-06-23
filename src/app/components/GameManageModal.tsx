@@ -1,0 +1,271 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus } from 'lucide-react';
+import { Button } from './ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from './ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import type { Game } from '../types/game';
+import { SaveManagerPanel } from './SaveManagerPanel';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
+
+interface InstalledDlc {
+  hash: string;
+  title_id: string;
+  name: string;
+}
+
+interface GameManageModalProps {
+  game: Game;
+  open: boolean;
+  onClose: () => void;
+  canEdit?: boolean;
+  onSaveGame?: (game: Game) => void;
+}
+
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
+  const [updateInstalled, setUpdateInstalled] = useState(false);
+  const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
+  const [confirmAction, setConfirmAction] = useState<{ type: string; label: string; onConfirm: () => void } | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const updateStatus = game.updateStatus || 'hidden';
+  const dlcNames = game.dlcNames || [];
+  const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
+  const showSavesTab = !game.disableSaveManager;
+  const useTabs = showAssetsTab && showSavesTab;
+
+  const refresh = useCallback(() => {
+    const w = window as any;
+    if (w.isUpdateInstalled) setUpdateInstalled(w.isUpdateInstalled(game.recompName));
+    if (w.getInstalledDlc) {
+      const dlc = w.getInstalledDlc(game.recompName);
+      setInstalledDlc(Array.isArray(dlc) ? dlc : (typeof dlc === 'string' ? JSON.parse(dlc) : []));
+    }
+    if (w.isExtracting) setExtracting(w.isExtracting());
+    if (w.getExtractError) {
+      const err = w.getExtractError();
+      if (err) setExtractError(err);
+    }
+  }, [game.recompName]);
+
+  useEffect(() => {
+    if (!open) return;
+    refresh();
+    pollRef.current = setInterval(refresh, 1500);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [open, refresh]);
+
+  const handleInstallAssetPick = useCallback(() => {
+    const w = window as any;
+    if (w.InstallAssetPick) {
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', JSON.stringify(dlcNames));
+      setExtracting(true);
+    }
+  }, [game.recompName, game.updateChecksum, dlcNames]);
+
+  const handleRemoveUpdate = useCallback(() => {
+    setConfirmAction({
+      type: 'remove-update',
+      label: 'Remove the installed title update?',
+      onConfirm: () => {
+        const w = window as any;
+        if (w.RemoveUpdate) w.RemoveUpdate(game.recompName);
+        setConfirmAction(null);
+        setTimeout(refresh, 200);
+      },
+    });
+  }, [game.recompName, refresh]);
+
+  const handleRemoveDlc = useCallback((dlc: InstalledDlc) => {
+    setConfirmAction({
+      type: 'remove-dlc',
+      label: `Remove DLC "${dlc.name || dlc.hash}"?`,
+      onConfirm: () => {
+        const w = window as any;
+        if (w.RemoveDlc) w.RemoveDlc(game.recompName, dlc.title_id, dlc.hash);
+        setConfirmAction(null);
+        setTimeout(refresh, 200);
+      },
+    });
+  }, [game.recompName, refresh]);
+
+  const matchDlcName = (installed: InstalledDlc): string | null => {
+    return dlcNames.find(n => n.trim().toLowerCase() === installed.name.trim().toLowerCase()) || null;
+  };
+
+  const handleAddKnownDlc = useCallback((name: string) => {
+    if (!onSaveGame || !name.trim()) return;
+    const updated = { ...game, dlcNames: [...(game.dlcNames || []), name.trim()] };
+    onSaveGame(updated);
+  }, [game, onSaveGame]);
+
+  const assetsPanel = showAssetsTab && (
+    <div className="space-y-4">
+      {extracting && (
+        <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-selected)' }}>
+          <RefreshCw className="w-4 h-4 shrink-0 animate-spin" style={{ color: 'var(--theme-accent)' }} />
+          <span className="text-sm font-medium shrink-0" style={{ color: 'var(--theme-text-primary)' }}>Extracting...</span>
+        </div>
+      )}
+      {extractError && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/20 text-red-300 text-sm">
+          <AlertTriangle className="w-4 h-4" />
+          {extractError}
+          <button onClick={() => { setExtractError(null); const w = window as any; if (w.clearExtractError) w.clearExtractError(); }} className="ml-auto"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Update row */}
+      {updateStatus !== 'hidden' && (
+        <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--theme-text-primary)' }}>Title Update</p>
+              {game.updateChecksum && (
+                <p className="text-xs mt-0.5" style={{ color: 'var(--theme-text-muted)' }}>
+                  SHA-256: {game.updateChecksum.slice(0, 16)}...
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {updateInstalled ? (
+                <>
+                  <span className="text-xs flex items-center gap-1 text-green-400"><Check className="w-3 h-3" /> Installed</span>
+                  <Button size="sm" variant="ghost" onClick={() => { const w = window as any; if (w.openUpdateFolder) w.openUpdateFolder(game.recompName); }} title="Open folder"><FolderOpen className="w-4 h-4" /></Button>
+                  <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={handleRemoveUpdate}><Trash2 className="w-3 h-3" /></Button>
+                </>
+              ) : (
+                <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstallAssetPick} disabled={extracting}>
+                  <Download className="w-3 h-3 mr-1" /> Browse...
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DLC section — always shown in the assets panel */}
+      <div>
+        <p className="text-sm font-semibold mb-2" style={{ color: 'var(--theme-text-primary)' }}>DLC</p>
+        <div className="space-y-2">
+          {/* Known DLC names from game config */}
+          {dlcNames.map((name, i) => {
+            const installed = installedDlc.find(d => matchDlcName(d) === name);
+            return (
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+                <p className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>{name}</p>
+                <div className="flex items-center gap-2">
+                  {installed ? (
+                    <>
+                      <span className="text-xs flex items-center gap-1 text-green-400"><Check className="w-3 h-3" /> Installed</span>
+                      <Button size="sm" variant="ghost" onClick={() => { const w = window as any; if (w.openDlcFolder) w.openDlcFolder(game.recompName, installed.title_id, installed.hash); }} title="Open folder"><FolderOpen className="w-3 h-3" /></Button>
+                      <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => handleRemoveDlc(installed)}><Trash2 className="w-3 h-3" /></Button>
+                    </>
+                  ) : (
+                    <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Not installed</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {/* Unknown installed DLC (not in dlcNames) */}
+          {installedDlc.filter(d => !matchDlcName(d)).map(dlc => (
+            <div key={dlc.hash} className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+              <p className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>{dlc.name || dlc.hash}</p>
+              <div className="flex items-center gap-2">
+                {canEdit && onSaveGame && dlc.name ? (
+                  <button
+                    onClick={() => handleAddKnownDlc(dlc.name)}
+                    className="text-xs flex items-center gap-1 text-yellow-400 hover:text-green-400 transition-colors group cursor-pointer"
+                    title="Add as known DLC"
+                  >
+                    <AlertTriangle className="w-3 h-3 group-hover:hidden" />
+                    <Plus className="w-3 h-3 hidden group-hover:block" />
+                    <span className="group-hover:hidden">Unknown</span>
+                    <span className="hidden group-hover:inline">Add to known</span>
+                  </button>
+                ) : (
+                  <span className="text-xs flex items-center gap-1 text-yellow-400"><AlertTriangle className="w-3 h-3" /> Unknown</span>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => { const w = window as any; if (w.openDlcFolder) w.openDlcFolder(game.recompName, dlc.title_id, dlc.hash); }} title="Open folder"><FolderOpen className="w-3 h-3" /></Button>
+                <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => handleRemoveDlc(dlc)}><Trash2 className="w-3 h-3" /></Button>
+              </div>
+            </div>
+          ))}
+          {dlcNames.length === 0 && installedDlc.length === 0 && (
+            <p className="text-xs py-2" style={{ color: 'var(--theme-text-muted)' }}>No DLC installed.</p>
+          )}
+        </div>
+        <Button size="sm" className="mt-3 bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstallAssetPick} disabled={extracting}>
+          <Download className="w-3 h-3 mr-1" /> Add...
+        </Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+        <DialogContent
+          className="sm:max-w-lg max-h-[80vh] overflow-y-auto"
+          style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>
+              Manage — {game.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          {useTabs ? (
+            <Tabs defaultValue="assets">
+              <TabsList style={{ backgroundColor: 'var(--theme-item-default)' }}>
+                <TabsTrigger value="assets" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Assets</TabsTrigger>
+                <TabsTrigger value="saves" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Saves</TabsTrigger>
+              </TabsList>
+              <TabsContent value="assets">{assetsPanel}</TabsContent>
+              <TabsContent value="saves">
+                <SaveManagerPanel recompName={game.recompName} />
+              </TabsContent>
+            </Tabs>
+          ) : showAssetsTab ? (
+            assetsPanel
+          ) : showSavesTab ? (
+            <SaveManagerPanel recompName={game.recompName} />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation dialog for destructive actions */}
+      <AlertDialog open={!!confirmAction} onOpenChange={o => { if (!o) setConfirmAction(null); }}>
+        <AlertDialogContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: 'var(--theme-text-primary)' }}>Confirm</AlertDialogTitle>
+            <AlertDialogDescription style={{ color: 'var(--theme-text-muted)' }}>
+              {confirmAction?.label}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel style={{ color: 'var(--theme-text-muted)', borderColor: 'var(--theme-border)' }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => confirmAction?.onConfirm()}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
