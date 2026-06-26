@@ -31,6 +31,7 @@ import { LibraryBanners } from '../components/LibraryBanners';
 import { GameDetailHeader } from '../components/GameDetailHeader';
 import { GameMediaCarousel } from '../components/GameMediaCarousel';
 import { ConfirmCloseGameDialog } from '../components/ConfirmCloseGameDialog';
+import { ConfirmRemoveBuildDialog } from '../components/ConfirmRemoveBuildDialog';
 import { ExtractErrorDialog } from '../components/ExtractErrorDialog';
 import { GameManageModal } from '../components/GameManageModal';
 
@@ -71,6 +72,7 @@ export function Library() {
   const [editingDescription, setEditingDescription] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+  const [pendingRemoveBuild, setPendingRemoveBuild] = useState<{ name: string; version?: string; asset?: string } | null>(null);
   const appliedUrlRef = useMemo(() => ({ current: undefined as string | undefined }), []);
 
   const visibleGames = useMemo(() => {
@@ -289,18 +291,23 @@ export function Library() {
   }, [selectedGame, updateInfo, newerReleaseAvailable, setSelectedTag, installation]);
 
   const removeBuild = useCallback((build: { name: string; version?: string; asset?: string }) => {
-    if (!selectedGame) return;
+    setPendingRemoveBuild(build);
+  }, []);
+
+  const confirmRemoveBuild = useCallback(() => {
+    if (!selectedGame || !pendingRemoveBuild) return;
     const w = window as any;
     if (typeof w.Uninstall !== 'function') return;
-    w.Uninstall(selectedGame.recompName, build.name);
-    if (selectedBuild?.name === build.name) {
-      const remaining = installation.installedBuilds.filter(b => b.name !== build.name);
+    w.Uninstall(selectedGame.recompName, pendingRemoveBuild.name);
+    if (selectedBuild?.name === pendingRemoveBuild.name) {
+      const remaining = installation.installedBuilds.filter(b => b.name !== pendingRemoveBuild.name);
       const next = remaining[0] ?? null;
       setSelectedTag(next?.version);
       setSelectedAsset(next?.asset);
     }
     installation.checkState();
-  }, [selectedGame, selectedBuild, setSelectedTag, setSelectedAsset, installation]);
+    setPendingRemoveBuild(null);
+  }, [selectedGame, pendingRemoveBuild, selectedBuild, setSelectedTag, setSelectedAsset, installation]);
 
   const removeAssets = useCallback(() => {
     if (!selectedGame) return;
@@ -663,6 +670,12 @@ export function Library() {
         runningGame={runningGameHook.runningGame}
         onCancel={() => runningGameHook.setPendingPlayBuild(null)}
         onConfirm={runningGameHook.confirmCloseAndPlay}
+      />
+
+      <ConfirmRemoveBuildDialog
+        build={pendingRemoveBuild}
+        onCancel={() => setPendingRemoveBuild(null)}
+        onConfirm={confirmRemoveBuild}
       />
 
       <ExtractErrorDialog
