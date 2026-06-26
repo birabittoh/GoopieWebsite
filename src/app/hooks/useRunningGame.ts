@@ -66,7 +66,12 @@ export function useRunningGame({
     setAudioMuted(true);
     setLaunchError(null);
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
-    w.Play(selectedGame.recompName, build.name, buildCvarArgs(), undefined, selectedGame.setGameDataRootToAssets === true);
+    let cvarArgs = buildCvarArgs();
+    if (selectedGame.isXBLA) {
+      const prefix = '--license_mask=1';
+      cvarArgs = cvarArgs ? `${prefix} ${cvarArgs}` : prefix;
+    }
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true);
   }, [selectedGame, buildCvarArgs, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {

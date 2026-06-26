@@ -121,6 +121,13 @@ export interface Game {
   dlcNames?: string[];
 
   /**
+   * When true, the game's base data comes from an XBLA (STFS) package
+   * instead of a disc ISO. Affects the file-picker filter (no filter
+   * for XBLA vs .iso-only) and forces `--license_mask=1` at launch.
+   */
+  isXBLA?: boolean;
+
+  /**
    * Configurable cvars exposed to the player as a settings panel on the
    * game page. Their values are appended as `-tag value` pairs to the
    * launch command passed to the launcher.

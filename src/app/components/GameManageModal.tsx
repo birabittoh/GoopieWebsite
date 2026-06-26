@@ -65,10 +65,10 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const handleInstallAssetPick = useCallback(() => {
     const w = window as any;
     if (w.InstallAssetPick) {
-      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames);
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, game.isXBLA === true);
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, dlcNames]);
+  }, [game.recompName, game.updateChecksum, game.isXBLA, dlcNames]);
 
   const handleFileDrop = useCallback((paths: string[]) => {
     const w = window as any;

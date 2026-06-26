@@ -126,7 +126,7 @@ export function useGameInstallation({
 
   const handleInstallIso = useCallback(() => {
     if (!selectedGame) return;
-    (window as any).Install(selectedGame.recompName);
+    (window as any).Install(selectedGame.recompName, selectedGame.isXBLA === true);
     setExtracting(true);
     setExtractProgress(0);
     setExtractString('');
