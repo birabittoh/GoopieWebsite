@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useFavorites } from '../data/useFavorites';
 import type { Game } from '../types/game';
 import type { GameRatingInfo } from '../data/useRatings';
+import { useCoverStyleMap } from '../hooks/useCoverStyle';
 
 interface GameGridProps {
   games: Game[];
@@ -29,6 +30,7 @@ export function GameGrid({
 }: GameGridProps) {
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites(user?.uid);
+  const coverStyles = useCoverStyleMap(games.map(g => g.coverImage));
 
   const [dragId, setDragId] = useState<string | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -87,7 +89,7 @@ export function GameGrid({
         const rating = ratings[game.id];
         const fav = isFavorite(game.id);
         const wrap = game.coverImage;
-        const FACE_BG_SIZE = '211% 100%';
+        const coverStyle = wrap ? coverStyles.get(wrap) : undefined;
         const isBeingDragged = dragId === game.id;
         return (
           <div
@@ -118,8 +120,8 @@ export function GameGrid({
                   style={{
                     backgroundColor: '#000',
                     backgroundImage: `url(${wrap})`,
-                    backgroundSize: FACE_BG_SIZE,
-                    backgroundPosition: 'right center',
+                    backgroundSize: coverStyle?.backgroundSize ?? '211% 100%',
+                    backgroundPosition: coverStyle?.backgroundPosition ?? 'right center',
                     backgroundRepeat: 'no-repeat',
                     border: '1px solid var(--theme-border)',
                     boxShadow: '0 8px 20px rgba(0,0,0,0.45)',
@@ -143,8 +145,8 @@ export function GameGrid({
                     style={{
                       backgroundColor: '#000',
                       backgroundImage: `url(${wrap})`,
-                      backgroundSize: FACE_BG_SIZE,
-                      backgroundPosition: 'left center',
+                      backgroundSize: coverStyle?.backgroundSize ?? '211% 100%',
+                      backgroundPosition: coverStyle?.backgroundSize === 'cover' ? 'center' : 'left center',
                       backgroundRepeat: 'no-repeat',
                       border: '1px solid var(--theme-border)',
                       boxShadow: '0 8px 20px rgba(0,0,0,0.45)',

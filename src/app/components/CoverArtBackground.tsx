@@ -157,15 +157,20 @@ export function CoverArtBackground({
           if (img && img.complete && img.naturalWidth > 0) {
             const dx0 = x + gap;
             const dy0 = y + gap;
-            // The cover image is a full Xbox 360 case wrap
-            // (~700 back + ~80 spine + ~700 front). Source only the right
-            // portion (front cover) so tiles show a normal single-face cover
-            // rather than the whole squished wrap.
-            const FRONT_RATIO = 700 / 1480;
-            const sW = img.naturalWidth * FRONT_RATIO;
-            const sH = img.naturalHeight;
-            const sX = img.naturalWidth - sW;
-            const sY = 0;
+            const isLandscape = img.naturalWidth > img.naturalHeight;
+            let sX: number, sY: number, sW: number, sH: number;
+            if (isLandscape) {
+              const FRONT_RATIO = 700 / 1480;
+              sW = img.naturalWidth * FRONT_RATIO;
+              sH = img.naturalHeight;
+              sX = img.naturalWidth - sW;
+              sY = 0;
+            } else {
+              sX = 0;
+              sY = 0;
+              sW = img.naturalWidth;
+              sH = img.naturalHeight;
+            }
             if (supportsRoundRect) {
               ctx.save();
               ctx.beginPath();

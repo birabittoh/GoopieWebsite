@@ -4,6 +4,7 @@ import { Plus, Filter, Star, GripVertical } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { Checkbox } from './ui/checkbox';
 import type { GameRatingInfo } from '../data/useRatings';
+import { useCoverStyle } from '../hooks/useCoverStyle';
 
 const statusColors: Record<Game['status'], string> = {
   Featured: 'bg-purple-600 text-white',
@@ -323,6 +324,7 @@ interface GameRowProps {
 }
 
 function GameRow({ game, gameRatings, showDragHandle }: GameRowProps) {
+  const coverStyle = useCoverStyle(game.coverImage);
   return (
     <div className="flex gap-3">
       {showDragHandle && (
@@ -335,10 +337,6 @@ function GameRow({ game, gameRatings, showDragHandle }: GameRowProps) {
           <GripVertical className="w-4 h-4" />
         </span>
       )}
-      {/* The cover image is a full Xbox 360 case wrap
-          (~700 back + ~80 spine + ~700 front). Scale the wrap so
-          the front portion fills the tile (1480/700 ≈ 211%) and
-          anchor right so only the front face shows. */}
       <div
         className="w-20 h-28 rounded shrink-0"
         role="img"
@@ -346,8 +344,8 @@ function GameRow({ game, gameRatings, showDragHandle }: GameRowProps) {
         style={{
           backgroundColor: '#000',
           backgroundImage: `url(${game.coverImage})`,
-          backgroundSize: '211% 100%',
-          backgroundPosition: 'right center',
+          backgroundSize: coverStyle.backgroundSize,
+          backgroundPosition: coverStyle.backgroundPosition,
           backgroundRepeat: 'no-repeat',
         }}
       />
