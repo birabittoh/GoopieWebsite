@@ -2,16 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from './ui/alert-dialog';
+import { ConfirmDialog } from './ConfirmDialog';
 import {
   Dialog,
   DialogContent,
@@ -269,21 +260,14 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
         </DialogContent>
       </Dialog>
 
-      {/* Confirmation dialog for destructive actions */}
-      <AlertDialog open={!!confirmAction} onOpenChange={o => { if (!o) setConfirmAction(null); }}>
-        <AlertDialogContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle style={{ color: 'var(--theme-text-primary)' }}>Confirm</AlertDialogTitle>
-            <AlertDialogDescription style={{ color: 'var(--theme-text-muted)' }}>
-              {confirmAction?.label}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel style={{ color: 'var(--theme-text-muted)', borderColor: 'var(--theme-border)' }}>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => confirmAction?.onConfirm()}>Remove</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!confirmAction}
+        title="Confirm"
+        description={confirmAction?.label ?? ''}
+        confirmLabel="Remove"
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => confirmAction?.onConfirm()}
+      />
     </>
   );
 }
