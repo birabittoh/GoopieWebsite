@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Game, Platform } from '../types/game';
 import { Plus, Filter, Star, GripVertical } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
@@ -74,7 +74,52 @@ interface GameListProps {
 export function GameList({ games, selectedGameId, onSelectGame, onCreateGame, statusFilters, onStatusFiltersChange, tagFilters, onTagFiltersChange, hideExternal, onHideExternalChange, allTags, platformFilters, onPlatformFiltersChange, gameRatings, favoriteIds, onReorderFavorites, className }: GameListProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [dragFavId, setDragFavId] = useState<string | null>(null);
-  const [hoverFavId, setHoverFavId] = useState<string | null>(null);
+  const favListRef = useRef<HTMLDivElement>(null);
+  const pendingDrag = useRef<{ id: string; x: number; y: number } | null>(null);
+
+  const findFavId = useCallback((el: Element | null): string | null => {
+    while (el && el !== favListRef.current) {
+      if (el instanceof HTMLElement && el.dataset.favId) return el.dataset.favId;
+      el = el.parentElement;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    const canDrag = !!onReorderFavorites;
+    if (!canDrag) return;
+
+    const onMove = (e: PointerEvent) => {
+      if (pendingDrag.current) {
+        const dx = e.clientX - pendingDrag.current.x;
+        const dy = e.clientY - pendingDrag.current.y;
+        if (dx * dx + dy * dy > 25) {
+          setDragFavId(pendingDrag.current.id);
+          pendingDrag.current = null;
+        }
+        return;
+      }
+      if (!dragFavId) return;
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const targetId = findFavId(target);
+      if (targetId && targetId !== dragFavId && favoriteIds && onReorderFavorites) {
+        const from = favoriteIds.indexOf(dragFavId);
+        const to = favoriteIds.indexOf(targetId);
+        if (from !== -1 && to !== -1 && from !== to) onReorderFavorites(from, to);
+      }
+    };
+    const onUp = () => {
+      pendingDrag.current = null;
+      if (!dragFavId) return;
+      setDragFavId(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [onReorderFavorites, dragFavId, findFavId, favoriteIds]);
 
   const favSet = new Set(favoriteIds ?? []);
   const favGames = games.filter(g => favSet.has(g.id));
@@ -212,42 +257,35 @@ export function GameList({ games, selectedGameId, onSelectGame, onCreateGame, st
                 </span>
                 <div className="flex-1 h-px" style={{ backgroundColor: 'var(--theme-border)' }} />
               </div>
+              <div ref={favListRef}>
               {favGames.map(game => {
-                const isHover = hoverFavId === game.id && dragFavId !== null && dragFavId !== game.id;
                 const isDragging = dragFavId === game.id;
                 const canDrag = !!onReorderFavorites && favGames.length > 1;
                 return (
                   <button
                     key={game.id}
-                    onClick={() => onSelectGame(game.id)}
-                    draggable={canDrag}
-                    onDragStart={() => { if (canDrag) setDragFavId(game.id); }}
-                    onDragOver={e => { if (canDrag && dragFavId) { e.preventDefault(); setHoverFavId(game.id); } }}
-                    onDrop={e => {
-                      if (!canDrag || !dragFavId || !favoriteIds || !onReorderFavorites) return;
+                    data-fav-id={game.id}
+                    onClick={() => { if (!dragFavId) onSelectGame(game.id); }}
+                    onPointerDown={canDrag ? (e) => {
+                      if (e.button !== 0) return;
+                      if (!(e.target as HTMLElement).closest('[data-drag-handle]')) return;
                       e.preventDefault();
-                      const from = favoriteIds.indexOf(dragFavId);
-                      const to = favoriteIds.indexOf(game.id);
-                      if (from !== -1 && to !== -1 && from !== to) onReorderFavorites(from, to);
-                      setDragFavId(null);
-                      setHoverFavId(null);
-                    }}
-                    onDragEnd={() => { setDragFavId(null); setHoverFavId(null); }}
+                      pendingDrag.current = { id: game.id, x: e.clientX, y: e.clientY };
+                    } : undefined}
                     className="w-full text-left p-3 rounded mb-1 transition-colors"
                     style={{
-                      backgroundColor: isHover
-                        ? 'var(--theme-item-hover)'
-                        : selectedGameId === game.id ? 'var(--theme-item-selected)' : 'var(--theme-item-default)',
+                      backgroundColor: selectedGameId === game.id ? 'var(--theme-item-selected)' : 'var(--theme-item-default)',
                       opacity: isDragging ? 0.5 : 1,
-                      cursor: canDrag ? 'grab' : undefined,
+                      cursor: dragFavId ? 'grabbing' : undefined,
                     }}
-                    onMouseEnter={e => { if (selectedGameId !== game.id && !isHover) e.currentTarget.style.backgroundColor = 'var(--theme-item-hover)'; }}
-                    onMouseLeave={e => { if (selectedGameId !== game.id && !isHover) e.currentTarget.style.backgroundColor = 'var(--theme-item-default)'; }}
+                    onMouseEnter={e => { if (selectedGameId !== game.id) e.currentTarget.style.backgroundColor = 'var(--theme-item-hover)'; }}
+                    onMouseLeave={e => { if (selectedGameId !== game.id) e.currentTarget.style.backgroundColor = 'var(--theme-item-default)'; }}
                   >
                     <GameRow game={game} gameRatings={gameRatings} showDragHandle={canDrag} />
                   </button>
                 );
               })}
+              </div>
               {otherGames.length > 0 && (
                 <div className="flex items-center gap-2 px-1 pt-3 pb-2">
                   <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--theme-text-muted)' }}>
@@ -289,8 +327,9 @@ function GameRow({ game, gameRatings, showDragHandle }: GameRowProps) {
     <div className="flex gap-3">
       {showDragHandle && (
         <span
+          data-drag-handle
           className="flex items-center justify-center shrink-0"
-          style={{ color: 'var(--theme-text-muted)' }}
+          style={{ color: 'var(--theme-text-muted)', cursor: 'grab' }}
           aria-hidden
         >
           <GripVertical className="w-4 h-4" />

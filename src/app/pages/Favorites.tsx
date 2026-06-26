@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Star, X } from 'lucide-react';
 import { TopBar } from '../components/TopBar';
 import { Sidebar, SIDEBAR_WIDTH_CLASS } from '../components/Sidebar';
@@ -17,7 +17,6 @@ export function Favorites() {
   const { favorites, reorderFavorites, removeFavorite } = useFavorites(user?.uid);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [dragId, setDragId] = useState<string | null>(null);
 
   const visibleGames = useMemo(
     () => getVisibleGames(user?.role, user?.assignedGames || []),
@@ -41,14 +40,12 @@ export function Favorites() {
     return result;
   }, [favorites, visibleGames, searchQuery]);
 
-  const handleDrop = (targetId: string) => {
-    if (!dragId || dragId === targetId) return;
-    const from = favorites.indexOf(dragId);
-    const to = favorites.indexOf(targetId);
+  const handleReorder = useCallback((fromId: string, toId: string) => {
+    const from = favorites.indexOf(fromId);
+    const to = favorites.indexOf(toId);
     if (from === -1 || to === -1) return;
     reorderFavorites(from, to);
-    setDragId(null);
-  };
+  }, [favorites, reorderFavorites]);
 
   const subtitle = searchQuery
     ? 'Filtered by your search.'
@@ -86,11 +83,7 @@ export function Favorites() {
             ratings={gameRatings}
             emptyMessage={emptyMessage}
             draggableItems={!searchQuery}
-            draggingId={dragId}
-            onItemDragStart={(id) => setDragId(id)}
-            onItemDragOver={(_id, e) => { e.preventDefault(); }}
-            onItemDrop={(id, e) => { e.preventDefault(); handleDrop(id); }}
-            onItemDragEnd={() => setDragId(null)}
+            onReorder={handleReorder}
             renderOverlay={(game) => (
               <button
                 onClick={(e) => {

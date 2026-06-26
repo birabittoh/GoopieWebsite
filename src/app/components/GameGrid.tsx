@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Star } from 'lucide-react';
 import { StarRating } from './StarRating';
@@ -10,14 +11,10 @@ interface GameGridProps {
   games: Game[];
   ratings: Record<string, GameRatingInfo>;
   emptyMessage?: string;
-  /** When true, disables flip and lets parent drag the card. */
+  /** When true, enables pointer-based reordering. */
   draggableItems?: boolean;
-  /** Id of the currently dragged game (so parent can style). */
-  draggingId?: string | null;
-  onItemDragStart?: (gameId: string) => void;
-  onItemDragOver?: (gameId: string, e: React.DragEvent) => void;
-  onItemDrop?: (gameId: string, e: React.DragEvent) => void;
-  onItemDragEnd?: () => void;
+  /** Called with (fromId, toId) when a card is dropped onto another. */
+  onReorder?: (fromId: string, toId: string) => void;
   /** Optional overlay rendered on top of each card (e.g. remove button). */
   renderOverlay?: (game: Game) => React.ReactNode;
 }
@@ -27,15 +24,54 @@ export function GameGrid({
   ratings,
   emptyMessage = 'No games found.',
   draggableItems = false,
-  draggingId = null,
-  onItemDragStart,
-  onItemDragOver,
-  onItemDrop,
-  onItemDragEnd,
+  onReorder,
   renderOverlay,
 }: GameGridProps) {
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites(user?.uid);
+
+  const [dragId, setDragId] = useState<string | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const pendingDrag = useRef<{ id: string; x: number; y: number } | null>(null);
+
+  const findGameId = useCallback((el: Element | null): string | null => {
+    while (el && el !== gridRef.current) {
+      if (el instanceof HTMLElement && el.dataset.gameId) return el.dataset.gameId;
+      el = el.parentElement;
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
+    if (!draggableItems) return;
+
+    const onMove = (e: PointerEvent) => {
+      if (pendingDrag.current) {
+        const dx = e.clientX - pendingDrag.current.x;
+        const dy = e.clientY - pendingDrag.current.y;
+        if (dx * dx + dy * dy > 25) {
+          setDragId(pendingDrag.current.id);
+          pendingDrag.current = null;
+        }
+        return;
+      }
+      if (!dragId) return;
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      const targetId = findGameId(target);
+      if (targetId && targetId !== dragId) onReorder?.(dragId, targetId);
+    };
+    const onUp = () => {
+      pendingDrag.current = null;
+      if (!dragId) return;
+      setDragId(null);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [draggableItems, dragId, findGameId, onReorder]);
 
   if (games.length === 0) {
     return (
@@ -46,29 +82,26 @@ export function GameGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+    <div ref={gridRef} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
       {games.map(game => {
         const rating = ratings[game.id];
         const fav = isFavorite(game.id);
-        // The cover image is a full Xbox 360 case wrap: ~700px back +
-        // ~80px spine + ~700px front. To show only one side per face we
-        // scale the wrap so the front portion fills the card width
-        // (1480 / 700 ≈ 211%), then anchor right (front) or left (back).
         const wrap = game.coverImage;
         const FACE_BG_SIZE = '211% 100%';
-        const isBeingDragged = draggingId === game.id;
+        const isBeingDragged = dragId === game.id;
         return (
           <div
             key={game.id}
+            data-game-id={game.id}
             className="flex flex-col"
-            draggable={draggableItems}
-            onDragStart={draggableItems ? () => onItemDragStart?.(game.id) : undefined}
-            onDragOver={draggableItems ? (e) => onItemDragOver?.(game.id, e) : undefined}
-            onDrop={draggableItems ? (e) => onItemDrop?.(game.id, e) : undefined}
-            onDragEnd={draggableItems ? () => onItemDragEnd?.() : undefined}
+            onPointerDown={draggableItems ? (e) => {
+              if (e.button !== 0) return;
+              if ((e.target as HTMLElement).closest('a, button')) return;
+              pendingDrag.current = { id: game.id, x: e.clientX, y: e.clientY };
+            } : undefined}
             style={{
               opacity: isBeingDragged ? 0.5 : 1,
-              cursor: draggableItems ? 'grab' : undefined,
+              cursor: dragId ? 'grabbing' : undefined,
             }}
           >
             <div
