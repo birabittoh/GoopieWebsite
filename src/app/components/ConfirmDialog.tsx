@@ -43,6 +43,7 @@ export function ConfirmDialog({
         <DialogFooter className="gap-2 sm:gap-2">
           <Button
             variant="ghost"
+            className="hover:bg-[var(--theme-item-selected)]"
             onClick={onCancel}
             style={{ color: 'var(--theme-text-muted)' }}
           >

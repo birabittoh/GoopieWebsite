@@ -51,7 +51,7 @@ export function InstalledBuildsList({
               <Button
                 variant="ghost"
                 size="icon"
-                className="hover:opacity-80"
+                className="hover:opacity-80 hover:bg-[var(--theme-item-selected)]"
                 style={{ color: '#a52525' }}
                 title="Close this build"
                 onClick={() => onClose(build)}
@@ -62,7 +62,7 @@ export function InstalledBuildsList({
               <Button
                 variant="ghost"
                 size="icon"
-                className="hover:opacity-80"
+                className="hover:opacity-80 hover:bg-[var(--theme-item-selected)]"
                 style={{ color: 'var(--theme-text-secondary)' }}
                 title="Play this build"
                 onClick={() => onPlay(build)}
@@ -74,7 +74,7 @@ export function InstalledBuildsList({
               <Button
                 variant="ghost"
                 size="icon"
-                className="hover:opacity-80"
+                className="hover:opacity-80 hover:bg-[var(--theme-item-selected)]"
                 style={{ color: 'var(--theme-text-secondary)' }}
                 title="Open logs folder"
                 onClick={() => (window as any).openBuildLogsFolder(recompName, build.name)}
@@ -85,7 +85,7 @@ export function InstalledBuildsList({
             <Button
               variant="ghost"
               size="icon"
-              className="hover:opacity-80 disabled:opacity-30 disabled:pointer-events-none"
+              className="hover:opacity-80 hover:bg-[var(--theme-item-selected)] disabled:opacity-30 disabled:pointer-events-none"
               style={{ color: 'var(--theme-text-secondary)' }}
               title={isRunning ? 'Close the build before removing it' : 'Remove this build'}
               disabled={isRunning}
