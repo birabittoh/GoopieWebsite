@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Play, Trash2, X, ChevronDown } from 'lucide-react';
+import { Play, Trash2, X, ChevronDown, FileText } from 'lucide-react';
 import { Button } from './ui/button';
 import type { InstalledBuild } from '../data/useGameReleases';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 export function InstalledBuildsList({
   builds,
+  recompName,
   onPlay,
   onClose,
   onRemove,
@@ -12,6 +14,7 @@ export function InstalledBuildsList({
   compact,
 }: {
   builds: InstalledBuild[];
+  recompName: string;
   onPlay: (build: InstalledBuild) => void;
   onClose: (build: InstalledBuild) => void;
   onRemove: (build: InstalledBuild) => void;
@@ -65,6 +68,18 @@ export function InstalledBuildsList({
                 onClick={() => onPlay(build)}
               >
                 <Play className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
+              </Button>
+            )}
+            {isLauncherVersionAtLeast('1.4.0') && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hover:opacity-80"
+                style={{ color: 'var(--theme-text-secondary)' }}
+                title="Open logs folder"
+                onClick={() => (window as any).openBuildLogsFolder(recompName, build.name)}
+              >
+                <FileText className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
               </Button>
             )}
             <Button

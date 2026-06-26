@@ -264,7 +264,7 @@ export function GameActionButtons({
             stale={versionPicker.stale}
             updatedAt={versionPicker.updatedAt ?? undefined}
           />
-          <InstalledBuildsList builds={installedBuilds} onPlay={onRequestPlay} onClose={onCloseRunningGame} onRemove={onRemoveBuild} runningBuild={runningBuildForSelectedGame} compact={compact} />
+          <InstalledBuildsList builds={installedBuilds} recompName={game.recompName} onPlay={onRequestPlay} onClose={onCloseRunningGame} onRemove={onRemoveBuild} runningBuild={runningBuildForSelectedGame} compact={compact} />
         </div>
       )}
     </div>
