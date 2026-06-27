@@ -133,6 +133,12 @@ export interface Game {
   useXenosRenderer?: boolean;
 
   /**
+   * When false, the installed title update directory is not mounted at launch.
+   * Missing = true for backwards compatibility.
+   */
+  mountUpdate?: boolean;
+
+  /**
    * Configurable cvars exposed to the player as a settings panel on the
    * game page. Their values are appended as `-tag value` pairs to the
    * launch command passed to the launcher.

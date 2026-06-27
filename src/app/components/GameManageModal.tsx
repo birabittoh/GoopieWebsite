@@ -38,6 +38,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const updateStatus = game.updateStatus || 'hidden';
   const dlcNames = game.dlcNames || [];
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
+  const supportsMountToggle = isLauncherVersionAtLeast('1.4.1');
   const showSavesTab = !game.disableSaveManager;
   const useTabs = showAssetsTab && showSavesTab;
 
@@ -62,21 +63,23 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [open, refresh]);
 
+  const allowUpdate = updateStatus !== 'hidden' || updateInstalled;
+
   const handleInstallAssetPick = useCallback(() => {
     const w = window as any;
     if (w.InstallAssetPick) {
-      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, game.isXBLA === true);
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, true, allowUpdate);
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, game.isXBLA, dlcNames]);
+  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
 
   const handleFileDrop = useCallback((paths: string[]) => {
     const w = window as any;
     if (w.InstallAssetFiles && paths.length > 0) {
-      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames);
+      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames, allowUpdate);
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, dlcNames]);
+  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
 
   useEffect(() => {
     if (!open || !showAssetsTab) return;
@@ -140,8 +143,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
         </div>
       )}
 
-      {/* Update row */}
-      {updateStatus !== 'hidden' && (
+      {/* Update row — show when not hidden, or when hidden but already installed */}
+      {(updateStatus !== 'hidden' || updateInstalled) && (
         <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
           <div className="flex items-center justify-between">
             <div>
@@ -166,6 +169,20 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
               )}
             </div>
           </div>
+          {updateInstalled && onSaveGame && supportsMountToggle && (
+            <label className="flex items-center gap-2 mt-3 cursor-pointer">
+              <div className="relative inline-flex items-center">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={game.mountUpdate !== false}
+                  onChange={e => onSaveGame({ ...game, mountUpdate: e.target.checked ? undefined : false })}
+                />
+                <div className="w-9 h-5 peer-checked:bg-[#5c7e10] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" style={{ backgroundColor: game.mountUpdate === false ? 'var(--theme-item-selected)' : undefined }}></div>
+              </div>
+              <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Mount at launch</span>
+            </label>
+          )}
         </div>
       )}
 

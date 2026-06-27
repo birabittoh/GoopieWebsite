@@ -75,7 +75,7 @@ export function useRunningGame({
       const flag = '--gpu_plugin xenos';
       cvarArgs = cvarArgs ? `${flag} ${cvarArgs}` : flag;
     }
-    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true);
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, selectedGame.mountUpdate !== false);
   }, [selectedGame, buildCvarArgs, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {
