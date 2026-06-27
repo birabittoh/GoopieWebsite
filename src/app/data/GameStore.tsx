@@ -106,9 +106,18 @@ export function GameStoreProvider({ children }: { children: ReactNode }) {
   }, [games]);
 
   const saveGame = useCallback(async (game: Game) => {
-    const cleaned = Object.fromEntries(
-      Object.entries(game).filter(([, v]) => v !== undefined)
-    );
+    const stripUndefined = (obj: unknown): unknown => {
+      if (Array.isArray(obj)) return obj.map(stripUndefined);
+      if (obj !== null && typeof obj === 'object') {
+        return Object.fromEntries(
+          Object.entries(obj as Record<string, unknown>)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, stripUndefined(v)])
+        );
+      }
+      return obj;
+    };
+    const cleaned = stripUndefined(game);
     await setDoc(doc(db, GAMES_COLLECTION, game.id), cleaned);
   }, []);
 
