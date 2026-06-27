@@ -71,6 +71,10 @@ export function useRunningGame({
       const prefix = '--license_mask=1';
       cvarArgs = cvarArgs ? `${prefix} ${cvarArgs}` : prefix;
     }
+    if (selectedGame.useXenosRenderer) {
+      const flag = '--gpu_plugin xenos';
+      cvarArgs = cvarArgs ? `${flag} ${cvarArgs}` : flag;
+    }
     w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true);
   }, [selectedGame, buildCvarArgs, setAudioMuted]);
 

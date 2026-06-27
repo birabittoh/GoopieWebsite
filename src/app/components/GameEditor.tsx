@@ -449,6 +449,23 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
             </span>
           </div>
 
+          {/* Xenos renderer */}
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.useXenosRenderer === true}
+                onChange={e => update('useXenosRenderer', e.target.checked || undefined)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 peer-checked:bg-[#5c7e10] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" style={{ backgroundColor: form.useXenosRenderer ? undefined : 'var(--theme-item-selected)' }}></div>
+            </label>
+            <span className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>Xenos renderer</span>
+            <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+              {form.useXenosRenderer ? '— Launches with --gpu_plugin xenos' : '— Native renderer'}
+            </span>
+          </div>
+
           {/* XBLA toggle */}
           <div className="flex items-center gap-3">
             <label className="relative inline-flex items-center cursor-pointer">

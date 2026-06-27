@@ -128,6 +128,11 @@ export interface Game {
   isXBLA?: boolean;
 
   /**
+   * When true, launches with `--gpu_plugin xenos` to use the Xenia renderer.
+   */
+  useXenosRenderer?: boolean;
+
+  /**
    * Configurable cvars exposed to the player as a settings panel on the
    * game page. Their values are appended as `-tag value` pairs to the
    * launch command passed to the launcher.
