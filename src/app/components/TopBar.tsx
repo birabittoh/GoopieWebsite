@@ -11,10 +11,11 @@ interface TopBarProps {
   onSearchChange: (query: string) => void;
   audioMuted?: boolean;
   onToggleMute?: () => void;
+  audioDisabled?: boolean;
   isInCEF?: boolean;
 }
 
-export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, isInCEF }: TopBarProps) {
+export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, audioDisabled, isInCEF }: TopBarProps) {
   const { updateAvailable, latestVersion } = useLauncherUpdate();
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
 
@@ -68,9 +69,10 @@ export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, 
         {onToggleMute && (
           <button
             onClick={onToggleMute}
-            className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors"
+            disabled={audioDisabled}
+            className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-text-primary)' }}
-            title={audioMuted ? 'Unmute background audio' : 'Mute background audio'}
+            title={audioDisabled ? 'Audio paused while game is running' : audioMuted ? 'Unmute background audio' : 'Mute background audio'}
           >
             {audioMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>

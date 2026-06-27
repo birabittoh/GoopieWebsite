@@ -7,7 +7,8 @@ interface UseRunningGameOptions {
   selectedGame: Game | undefined;
   recordSession: (gameId: string, seconds: number) => Promise<void>;
   buildCvarArgs: () => string;
-  setAudioMuted: (value: boolean) => void;
+  audioMuted: boolean;
+  setAudioMuted: (value: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export function useRunningGame({
@@ -15,12 +16,14 @@ export function useRunningGame({
   selectedGame,
   recordSession,
   buildCvarArgs,
+  audioMuted,
   setAudioMuted,
 }: UseRunningGameOptions) {
   const [runningGame, setRunningGame] = useState<{ game: string; build: string } | null>(null);
   const runningGameRef = useRef<{ game: string; build: string; secondsPlayed: number } | null>(null);
   const [pendingPlayBuild, setPendingPlayBuild] = useState<InstalledBuild | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
+  const preLaunchMutedRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     setLaunchError(null);
@@ -41,6 +44,10 @@ export function useRunningGame({
       if (prev && (prev.game !== next?.game || prev.build !== next?.build)) {
         const finishedGame = games.find(g => g.recompName === prev.game);
         if (finishedGame) void recordSession(finishedGame.id, prev.secondsPlayed);
+        if (!next && preLaunchMutedRef.current !== null) {
+          setAudioMuted(preLaunchMutedRef.current);
+          preLaunchMutedRef.current = null;
+        }
       }
 
       runningGameRef.current = next;
@@ -57,12 +64,15 @@ export function useRunningGame({
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [games, recordSession]);
+  }, [games, recordSession, setAudioMuted]);
 
   const playBuild = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;
     const w = window as any;
     if (typeof w.Play !== 'function') return;
+    if (preLaunchMutedRef.current === null) {
+      preLaunchMutedRef.current = audioMuted;
+    }
     setAudioMuted(true);
     setLaunchError(null);
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
@@ -76,7 +86,7 @@ export function useRunningGame({
       cvarArgs = cvarArgs ? `${flag} ${cvarArgs}` : flag;
     }
     w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, selectedGame.mountUpdate !== false);
-  }, [selectedGame, buildCvarArgs, setAudioMuted]);
+  }, [selectedGame, buildCvarArgs, audioMuted, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;

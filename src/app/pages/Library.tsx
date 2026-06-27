@@ -200,6 +200,7 @@ export function Library() {
     selectedGame,
     recordSession,
     buildCvarArgs,
+    audioMuted,
     setAudioMuted,
   });
 
@@ -500,7 +501,7 @@ export function Library() {
         openExternal={openExternal}
       />
       <div className="relative z-20">
-        <TopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} audioMuted={audioMuted} onToggleMute={() => setAudioMuted(m => !m)} isInCEF={isInCEF} />
+        <TopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} audioMuted={audioMuted} onToggleMute={() => setAudioMuted(m => !m)} audioDisabled={!!runningGameHook.runningGame} isInCEF={isInCEF} />
       </div>
 
       <div className="flex flex-1 overflow-hidden relative z-10">
