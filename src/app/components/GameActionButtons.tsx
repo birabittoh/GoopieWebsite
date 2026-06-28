@@ -188,7 +188,7 @@ export function GameActionButtons({
                 <RefreshCw className={`${iconSize} ${iconMr}`} /> Switch to {newerInstalledBuild.version || newerInstalledBuild.name}
               </Button>
             )}
-            {selectedBuild && (
+            {selectedBuild && !runningBuildForSelectedGame && (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={() => onRemoveBuild(selectedBuild)}>
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
               </Button>
@@ -212,7 +212,7 @@ export function GameActionButtons({
                 <Download className={`${iconSize} ${iconMr}`} /> {selectedBuild ? 'Update' : 'Install'}
               </Button>
             )}
-            {selectedBuild ? (
+            {selectedBuild && !runningBuildForSelectedGame ? (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={() => onRemoveBuild(selectedBuild)}>
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
               </Button>
