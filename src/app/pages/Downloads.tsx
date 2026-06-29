@@ -13,6 +13,7 @@ const RELEASE_BASE = 'https://github.com/birabittoh/GoopieLauncher/releases/late
 const WINDOWS_MSI_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.msi`;
 const WINDOWS_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.exe`;
 const LINUX_APPIMAGE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64.AppImage`;
+const LINUX_PORTABLE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64`;
 
 function DownloadButton({ url, label }: { url: string; label: string }) {
   return (
@@ -104,6 +105,7 @@ export function Downloads() {
               </h2>
               <div className="flex flex-wrap gap-3">
                 <DownloadButton url={LINUX_APPIMAGE_URL} label="AppImage" />
+                <DownloadButton url={LINUX_PORTABLE_URL} label="Portable" />
               </div>
             </div>
           </div>
