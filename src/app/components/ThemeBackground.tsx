@@ -98,7 +98,7 @@ export function ThemeBackground() {
     <div
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none"
-      style={{ zIndex: -1 }}
+      style={{ zIndex: -1, backgroundColor: 'var(--theme-page-bg)' }}
     >
       <Suspense fallback={null}>{inner}</Suspense>
     </div>

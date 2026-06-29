@@ -44,13 +44,13 @@ interface ThemeColors {
 
 const themes: Record<ThemeName, ThemeColors> = {
   steam: {
-    pageBg: '#1b2838',
-    sidebarBg: '#171a21',
-    topbarBg: '#171a21',
-    cardBg: '#0e1419',
+    pageBg: 'rgba(0, 0, 0, 0)',
+    sidebarBg: 'rgba(23, 26, 33, 0.82)',
+    topbarBg: 'rgba(23, 26, 33, 0.82)',
+    cardBg: 'rgba(14, 20, 25, 0.78)',
     border: '#2a3f5f',
     itemSelected: '#2a475e',
-    itemHover: '#212832',
+    itemHover: 'rgba(33, 40, 50, 0.80)',
     itemDefault: 'transparent',
     accent: '#417cff',
     accentHover: '#5a93ff',

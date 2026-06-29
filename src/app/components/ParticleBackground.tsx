@@ -45,7 +45,8 @@ export function ParticleBackground() {
     };
 
     const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#1b2838';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // Draw links
       for (let i = 0; i < particles.length; i++) {

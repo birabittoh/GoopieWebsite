@@ -90,7 +90,7 @@ export function GameEditorPage() {
   const backTo = recompName ? `/library/${recompName}` : '/library';
 
   return (
-    <div className={`flex h-screen flex-col relative ${SIDEBAR_WIDTH_CLASS}`} style={{ backgroundColor: 'var(--theme-page-bg)' }}>
+    <div className={`flex h-screen flex-col relative overflow-hidden ${SIDEBAR_WIDTH_CLASS}`}>
       <Sidebar />
 
       <div className="flex flex-col flex-1 overflow-hidden">
@@ -136,7 +136,7 @@ export function GameEditorPage() {
         </div>
 
         {/* Scrollable form body */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
           <form id="game-editor-form" onSubmit={handleSubmit} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
             <EditorBasicInfo
               form={form}

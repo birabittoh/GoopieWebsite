@@ -487,7 +487,7 @@ export function Library() {
   }, [navigate]);
 
   return (
-    <div className={`flex h-screen flex-col relative ${SIDEBAR_WIDTH_CLASS}`} style={{ backgroundColor: 'var(--theme-page-bg)' }}>
+    <div className={`flex h-screen flex-col relative overflow-hidden ${SIDEBAR_WIDTH_CLASS}`}>
       <Sidebar />
       <LibraryBanners
         isLegacyLauncher={isLegacyLauncher}
@@ -535,7 +535,7 @@ export function Library() {
             Back to Library
           </button>
           {/* Scrollable content */}
-          <div className="flex-1 overflow-y-auto relative" >
+          <div className="flex-1 overflow-y-auto relative" style={{ overscrollBehavior: 'contain' }}>
           {selectedGame ? (
             <>
               <GameDetailHeader
