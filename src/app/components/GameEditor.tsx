@@ -722,6 +722,17 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
                 />
               </div>
             </div>
+            {form.updateStatus === 'optional' && (
+              <div className="mb-3">
+                <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>Title Update Build Regex</label>
+                <Input
+                  value={form.updateBuildPattern || ''}
+                  onChange={e => update('updateBuildPattern', e.target.value || undefined)}
+                  placeholder="e.g. ^tu-"
+                  style={inputStyle}
+                />
+              </div>
+            )}
             <div>
               <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>DLC Names</label>
               <div className="flex flex-wrap gap-2 mb-2">

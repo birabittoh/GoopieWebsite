@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Game } from '../types/game';
 import type { InstalledBuild } from '../data/useGameReleases';
+import { shouldMountUpdate } from '../utils/updateRequired';
 
 interface UseRunningGameOptions {
   games: Game[];
@@ -82,7 +83,7 @@ export function useRunningGame({
     setLaunchError(null);
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
     const cvarArgs = composeCvarArgs();
-    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, selectedGame.mountUpdate !== false);
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name));
   }, [selectedGame, composeCvarArgs, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {

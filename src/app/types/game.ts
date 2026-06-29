@@ -112,6 +112,14 @@ export interface Game {
   updateStatus?: 'required' | 'optional' | 'hidden';
 
   /**
+   * Regex matched against a build's asset name. Only meaningful when
+   * updateStatus === 'optional'. When set, builds whose asset name matches
+   * are treated as requiring the title update (gated like 'required');
+   * non-matching builds are unrestricted. Empty/invalid = no gating.
+   */
+  updateBuildPattern?: string;
+
+  /**
    * SHA-256 hash of the raw title update STFS file. When non-empty, the
    * launcher verifies the dropped/browsed file against this before installing.
    */
@@ -134,12 +142,6 @@ export interface Game {
    * When true, launches with `--gpu_plugin xenos` to use the Xenia renderer.
    */
   useXenosRenderer?: boolean;
-
-  /**
-   * When false, the installed title update directory is not mounted at launch.
-   * Missing = true for backwards compatibility.
-   */
-  mountUpdate?: boolean;
 
   /**
    * Configurable cvars exposed to the player as a settings panel on the

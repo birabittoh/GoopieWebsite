@@ -40,7 +40,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
   const updateStatus = game.updateStatus || 'hidden';
   const dlcNames = game.dlcNames || [];
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
-  const supportsMountToggle = isLauncherVersionAtLeast('1.4.1');
   const showSavesTab = !game.disableSaveManager;
   const showShortcutRow = isLauncherVersionAtLeast('1.5.0') && !!onCreateShortcut;
   const useTabs = showAssetsTab && showSavesTab;
@@ -173,20 +172,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
               )}
             </div>
           </div>
-          {updateInstalled && onSaveGame && supportsMountToggle && (
-            <label className="flex items-center gap-2 mt-3 cursor-pointer">
-              <div className="relative inline-flex items-center">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={game.mountUpdate !== false}
-                  onChange={e => onSaveGame({ ...game, mountUpdate: e.target.checked ? undefined : false })}
-                />
-                <div className="w-9 h-5 peer-checked:bg-[#5c7e10] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all" style={{ backgroundColor: game.mountUpdate === false ? 'var(--theme-item-selected)' : undefined }}></div>
-              </div>
-              <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Mount at launch</span>
-            </label>
-          )}
         </div>
       )}
 

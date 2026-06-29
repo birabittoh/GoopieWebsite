@@ -1,10 +1,13 @@
-import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { ConfirmDialog } from './ConfirmDialog';
 import { GameVersionPicker } from './GameVersionPicker';
 import { InstalledBuildsList } from './InstalledBuildsList';
 import type { Game } from '../types/game';
 import type { InstalledBuild, GameRelease, ReleaseAsset } from '../data/useGameReleases';
+import { updateRequiredForBuild } from '../utils/updateRequired';
 
 export interface GameActionButtonsProps {
   game: Game;
@@ -106,6 +109,7 @@ export function GameActionButtons({
   dlcInstalled,
   versionPicker,
 }: GameActionButtonsProps) {
+  const [showTuDialog, setShowTuDialog] = useState(false);
   const btnPx = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg';
   const btnPxSm = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg';
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5';
@@ -131,7 +135,7 @@ export function GameActionButtons({
 
   if (!isInCEF) return null;
 
-  return (
+  return (<>
     <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)] mb-4'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
       {extracting ? (
         <div className="flex items-center gap-2">
@@ -150,11 +154,13 @@ export function GameActionButtons({
           </div>
         ) : exeUpdated ? (
           <div className={`flex flex-wrap gap-${compact ? '2' : '3'}`}>
-            {game.updateStatus === 'required' && !updateInstalled ? (
-              <p className={`${compact ? 'text-xs' : 'text-sm'} flex items-center gap-1`} style={{ color: 'var(--theme-text-muted)' }}>
-                <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                Title update required.{onOpenManage && <button onClick={onOpenManage} className="underline hover:no-underline ml-1" style={{ color: 'var(--theme-accent)' }}>Install it in Manage.</button>}
-              </p>
+            {updateRequiredForBuild(game, selectedBuild?.asset || selectedBuild?.name) && !updateInstalled ? (
+              <Button
+                className={`bg-[#5c7e10] hover:bg-[#78a00f] text-white ${btnPx}`}
+                onClick={() => setShowTuDialog(true)}
+              >
+                <Play className={`${iconSize} ${iconMr}`} /> Play
+              </Button>
             ) : isSelectedBuildRunning ? (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPx}`} onClick={onCloseRunningGame}>
                 <X className={`${iconSize} ${iconMr}`} /> Close
@@ -188,11 +194,6 @@ export function GameActionButtons({
                 <RefreshCw className={`${iconSize} ${iconMr}`} /> Switch to {newerInstalledBuild.version || newerInstalledBuild.name}
               </Button>
             )}
-            {selectedBuild && !runningBuildForSelectedGame && (
-              <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={() => onRemoveBuild(selectedBuild)}>
-                <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
-              </Button>
-            )}
             {onOpenManage && (
               <Button
                 className={`text-white ${btnPxSm}`}
@@ -212,11 +213,7 @@ export function GameActionButtons({
                 <Download className={`${iconSize} ${iconMr}`} /> {selectedBuild ? 'Update' : 'Install'}
               </Button>
             )}
-            {selectedBuild && !runningBuildForSelectedGame ? (
-              <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={() => onRemoveBuild(selectedBuild)}>
-                <Trash2 className={`${iconSize} ${iconMr}`} /> Uninstall
-              </Button>
-            ) : installedBuilds.length === 0 && isoInstalled && !updateInstalled && !dlcInstalled && (
+            {installedBuilds.length === 0 && isoInstalled && !updateInstalled && !dlcInstalled && (
               <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={onRemoveAssets}>
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Remove assets
               </Button>
@@ -268,5 +265,15 @@ export function GameActionButtons({
         </div>
       )}
     </div>
+    <ConfirmDialog
+      open={showTuDialog}
+      title=""
+      description={<>This build requires the title update to be installed. You can install it from the Manage panel.{game.updateStatus === 'optional' && <><br />Another build may be available that does not require the title update.</>}</>}
+      confirmLabel="Install it"
+      confirmClassName="gap-2 bg-[#1a6bc4] hover:bg-[#2080e0] text-white border-0"
+      onConfirm={() => { setShowTuDialog(false); onOpenManage?.(); }}
+      onCancel={() => setShowTuDialog(false)}
+    />
+  </>
   );
 }
