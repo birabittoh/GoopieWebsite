@@ -34,7 +34,7 @@ export function useGameInstallation({
   const checkState = useCallback(() => {
     const w = window as any;
     if (selectedGame) {
-      setIsoInstalled(w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false);
+      setIsoInstalled(selectedGame.noAssetExtraction ? true : (w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false));
       if (isLauncherVersionAtLeast('1.4.0')) {
         if (w.isUpdateInstalled) setUpdateInstalled(w.isUpdateInstalled(selectedGame.recompName));
         if (w.getInstalledDlc) {
@@ -87,7 +87,7 @@ export function useGameInstallation({
             setExtractProgress(w.getExtractProgress ? w.getExtractProgress(selectedGame.id) : 0);
             setExtractString(w.getExtractString ? w.getExtractString(selectedGame.id) : 'Extracting...');
           } else {
-            setIsoInstalled(w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false);
+            setIsoInstalled(selectedGame.noAssetExtraction ? true : (w.isIsoInstalled ? w.isIsoInstalled(selectedGame.recompName) : false));
             if (isLauncherVersionAtLeast('1.3.1')) {
               const err = w.getExtractError ? w.getExtractError() : null;
               if (err) setExtractError(err);
@@ -125,7 +125,7 @@ export function useGameInstallation({
   }, [isInCEF, checkState]);
 
   const handleInstallIso = useCallback(() => {
-    if (!selectedGame) return;
+    if (!selectedGame || selectedGame.noAssetExtraction) return;
     (window as any).Install(selectedGame.recompName, selectedGame.isXBLA === true);
     setExtracting(true);
     setExtractProgress(0);

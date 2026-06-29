@@ -128,6 +128,13 @@ export interface Game {
   isXBLA?: boolean;
 
   /**
+   * When true, skips the asset extraction step entirely.
+   * Use for games that bundle their own launcher and ship pre-extracted assets
+   * inside the build download — no ISO/STFS file is needed from the user.
+   */
+  noAssetExtraction?: boolean;
+
+  /**
    * Configurable cvars exposed to the player as a settings panel on the
    * game page. Their values are appended as `-tag value` pairs to the
    * launch command passed to the launcher.

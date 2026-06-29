@@ -466,6 +466,23 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
             </span>
           </div>
 
+          {/* No Asset Extraction */}
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.noAssetExtraction === true}
+                onChange={e => update('noAssetExtraction', e.target.checked || undefined)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 peer-checked:bg-[#5c7e10] rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" style={{ backgroundColor: form.noAssetExtraction ? undefined : 'var(--theme-item-selected)' }}></div>
+            </label>
+            <span className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>No Asset Extraction</span>
+            <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+              {form.noAssetExtraction ? '— Skips ISO/STFS extraction; build download only' : '— Requires user to provide game files'}
+            </span>
+          </div>
+
           {/* External Launcher URL */}
           <div>
             <label className={labelClass} style={labelStyle}>External Launcher URL (optional)</label>
