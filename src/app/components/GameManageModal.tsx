@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus } from 'lucide-react';
+import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus, Link } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -25,11 +25,13 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
+  onCreateShortcut?: () => void;
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCreateShortcut }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
+  const [shortcutCreated, setShortcutCreated] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; label: string; onConfirm: () => void } | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
   const supportsMountToggle = isLauncherVersionAtLeast('1.4.1');
   const showSavesTab = !game.disableSaveManager;
+  const showShortcutRow = isLauncherVersionAtLeast('1.5.0') && !!onCreateShortcut;
   const useTabs = showAssetsTab && showSavesTab;
 
   const refresh = useCallback(() => {
@@ -54,7 +57,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
       const err = w.getExtractError();
       if (err) setExtractError(err);
     }
-  }, [game.recompName]);
+    if (w.shortcutExists) setShortcutCreated(!!w.shortcutExists(game.recompName, game.title));
+  }, [game.recompName, game.title]);
 
   useEffect(() => {
     if (!open) return;
@@ -183,6 +187,26 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
               <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Mount at launch</span>
             </label>
           )}
+        </div>
+      )}
+
+      {/* Shortcut row */}
+      {showShortcutRow && (
+        <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--theme-text-primary)' }}>Shortcut</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {shortcutCreated ? (
+                <span className="text-xs flex items-center gap-1 text-green-400"><Check className="w-3 h-3" /> Created.</span>
+              ) : (
+                <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => { onCreateShortcut(); setTimeout(refresh, 500); }}>
+                  <Link className="w-3 h-3 mr-1" /> Create
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

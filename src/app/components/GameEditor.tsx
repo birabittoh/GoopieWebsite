@@ -223,6 +223,11 @@ export function GameEditor({ game, onSave, onDelete, onClose, isNew, readOnly }:
             <Input value={form.coverImage} onChange={e => update('coverImage', e.target.value)} placeholder="https://..." style={inputStyle} required />
           </div>
 
+          <div>
+            <label className={labelClass} style={labelStyle}>Icon URL (for shortcuts; extracted from XEX if empty)</label>
+            <Input value={form.iconUrl || ''} onChange={e => update('iconUrl', e.target.value || undefined)} placeholder="https://..." style={inputStyle} />
+          </div>
+
           {/* Header Images (multiple, cycling) */}
           <div>
             <label className={labelClass} style={labelStyle}>Header Images (cycle every 7s) *</label>

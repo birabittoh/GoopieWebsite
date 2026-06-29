@@ -16,6 +16,9 @@ export interface Game {
   coverImage: string;
   headerImage: string | string[];
   titleImage?: string;
+  /** URL of an icon image used for desktop/application shortcuts. When unset,
+   *  the launcher extracts one from the game's default.xex. */
+  iconUrl?: string;
   description: string;
   isPublic?: boolean;
   pendingApproval?: boolean;
