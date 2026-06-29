@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { GameList } from '../components/GameList';
 import { TopBar } from '../components/TopBar';
 import { Sidebar, SIDEBAR_WIDTH_CLASS } from '../components/Sidebar';
@@ -198,6 +198,35 @@ export function Library() {
     buildCvarArgs,
     setAudioMuted,
   });
+
+  // --- Auto-play from --play CLI flag ---
+  const autoPlayRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    // First render: read the auto-play flag once.
+    if (autoPlayRef.current === undefined) {
+      const w = window as any;
+      const game = typeof w.getAutoPlayGame === 'function' ? w.getAutoPlayGame() : null;
+      autoPlayRef.current = game || null;
+      if (game) {
+        // Select the game so builds load.
+        const found = visibleGames.find(g => g.recompName === game);
+        if (found) setSelectedGameId(found.id);
+      }
+    }
+  }, [visibleGames]);
+
+  useEffect(() => {
+    if (!autoPlayRef.current) return;
+    if (!selectedGame || selectedGame.recompName !== autoPlayRef.current) return;
+    if (installation.installedBuilds.length === 0) return;
+    // We have the game selected and a build available — trigger play.
+    const build = findInstalledBuild(installation.installedBuilds, selectedTag, selectedAsset)
+      ?? installation.installedBuilds[0];
+    autoPlayRef.current = null;
+    const w = window as any;
+    if (typeof w.clearAutoPlayGame === 'function') w.clearAutoPlayGame();
+    runningGameHook.requestPlay(build);
+  }, [selectedGame, installation.installedBuilds, selectedTag, selectedAsset, runningGameHook]);
 
   // --- Derived state from installation + releases ---
 
@@ -670,6 +699,7 @@ export function Library() {
           onClose={() => setShowManageModal(false)}
           canEdit={canEditGame(selectedGame.id)}
           onSaveGame={saveGame}
+          onCreateShortcut={runningGameHook.createShortcut}
         />
       )}
     </div>

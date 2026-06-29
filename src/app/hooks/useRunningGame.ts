@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Game } from '../types/game';
 import type { InstalledBuild } from '../data/useGameReleases';
+import { shouldMountUpdate } from '../utils/updateRequired';
 
 interface UseRunningGameOptions {
   games: Game[];
@@ -59,6 +60,21 @@ export function useRunningGame({
     return () => clearInterval(interval);
   }, [games, recordSession]);
 
+  /** Assemble the full cvar args string (base cvars + XBLA + Xenos flags). */
+  const composeCvarArgs = useCallback((): string => {
+    if (!selectedGame) return '';
+    let cvarArgs = buildCvarArgs();
+    if (selectedGame.isXBLA) {
+      const prefix = '--license_mask=1';
+      cvarArgs = cvarArgs ? `${prefix} ${cvarArgs}` : prefix;
+    }
+    if (selectedGame.useXenosRenderer) {
+      const flag = '--gpu_plugin xenos';
+      cvarArgs = cvarArgs ? `${flag} ${cvarArgs}` : flag;
+    }
+    return cvarArgs;
+  }, [selectedGame, buildCvarArgs]);
+
   const playBuild = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;
     const w = window as any;
@@ -66,13 +82,9 @@ export function useRunningGame({
     setAudioMuted(true);
     setLaunchError(null);
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
-    let cvarArgs = buildCvarArgs();
-    if (selectedGame.isXBLA) {
-      const prefix = '--license_mask=1';
-      cvarArgs = cvarArgs ? `${prefix} ${cvarArgs}` : prefix;
-    }
-    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true);
-  }, [selectedGame, buildCvarArgs, setAudioMuted]);
+    const cvarArgs = composeCvarArgs();
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name));
+  }, [selectedGame, composeCvarArgs, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;
@@ -96,6 +108,14 @@ export function useRunningGame({
     playBuild(build);
   }, [pendingPlayBuild, closeRunningGame, playBuild]);
 
+  /** Create a desktop/application-menu shortcut for the selected game. */
+  const createShortcut = useCallback(() => {
+    if (!selectedGame) return;
+    const w = window as any;
+    if (typeof w.CreateShortcut !== 'function') return;
+    w.CreateShortcut(selectedGame.recompName, selectedGame.title, selectedGame.iconUrl || '');
+  }, [selectedGame]);
+
   const runningBuildForSelectedGame = (selectedGame && runningGame && runningGame.game === selectedGame.recompName)
     ? runningGame.build
     : null;
@@ -113,6 +133,7 @@ export function useRunningGame({
     runningBuildForSelectedGame,
     isSelectedBuildRunning,
     requestPlay,
+    createShortcut,
     closeRunningGame,
     confirmCloseAndPlay,
   };

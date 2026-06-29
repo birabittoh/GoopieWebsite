@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus } from 'lucide-react';
+import { Trash2, FolderOpen, Download, RefreshCw, Check, X, AlertTriangle, Plus, Link } from 'lucide-react';
 import { Button } from './ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -25,11 +25,13 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
+  onCreateShortcut?: () => void;
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCreateShortcut }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
+  const [shortcutCreated, setShortcutCreated] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; label: string; onConfirm: () => void } | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const dlcNames = game.dlcNames || [];
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
   const showSavesTab = !game.disableSaveManager;
+  const showShortcutRow = isLauncherVersionAtLeast('1.5.0') && !!onCreateShortcut;
   const useTabs = showAssetsTab && showSavesTab;
 
   const refresh = useCallback(() => {
@@ -53,7 +56,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
       const err = w.getExtractError();
       if (err) setExtractError(err);
     }
-  }, [game.recompName]);
+    if (w.shortcutExists) setShortcutCreated(!!w.shortcutExists(game.recompName, game.title));
+  }, [game.recompName, game.title]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,21 +66,23 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [open, refresh]);
 
+  const allowUpdate = updateStatus !== 'hidden' || updateInstalled;
+
   const handleInstallAssetPick = useCallback(() => {
     const w = window as any;
     if (w.InstallAssetPick) {
-      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, game.isXBLA === true);
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, true, allowUpdate);
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, game.isXBLA, dlcNames]);
+  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
 
   const handleFileDrop = useCallback((paths: string[]) => {
     const w = window as any;
     if (w.InstallAssetFiles && paths.length > 0) {
-      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames);
+      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames, allowUpdate);
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, dlcNames]);
+  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
 
   useEffect(() => {
     if (!open || !showAssetsTab) return;
@@ -140,8 +146,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
         </div>
       )}
 
-      {/* Update row */}
-      {updateStatus !== 'hidden' && (
+      {/* Update row — show when not hidden, or when hidden but already installed */}
+      {(updateStatus !== 'hidden' || updateInstalled) && (
         <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
           <div className="flex items-center justify-between">
             <div>
@@ -162,6 +168,26 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
               ) : (
                 <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstallAssetPick} disabled={extracting}>
                   <Download className="w-3 h-3 mr-1" /> Browse...
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Shortcut row */}
+      {showShortcutRow && (
+        <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--theme-text-primary)' }}>Shortcut</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {shortcutCreated ? (
+                <span className="text-xs flex items-center gap-1 text-green-400"><Check className="w-3 h-3" /> Created.</span>
+              ) : (
+                <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => { onCreateShortcut(); setTimeout(refresh, 500); }}>
+                  <Link className="w-3 h-3 mr-1" /> Create
                 </Button>
               )}
             </div>

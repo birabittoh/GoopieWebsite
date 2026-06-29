@@ -16,6 +16,9 @@ export interface Game {
   coverImage: string;
   headerImage: string | string[];
   titleImage?: string;
+  /** URL of an icon image used for desktop/application shortcuts. When unset,
+   *  the launcher extracts one from the game's default.xex. */
+  iconUrl?: string;
   description: string;
   isPublic?: boolean;
   pendingApproval?: boolean;
@@ -109,6 +112,14 @@ export interface Game {
   updateStatus?: 'required' | 'optional' | 'hidden';
 
   /**
+   * Regex matched against a build's asset name. Only meaningful when
+   * updateStatus === 'optional'. When set, builds whose asset name matches
+   * are treated as requiring the title update (gated like 'required');
+   * non-matching builds are unrestricted. Empty/invalid = no gating.
+   */
+  updateBuildPattern?: string;
+
+  /**
    * SHA-256 hash of the raw title update STFS file. When non-empty, the
    * launcher verifies the dropped/browsed file against this before installing.
    */
@@ -133,6 +144,11 @@ export interface Game {
    * inside the build download — no ISO/STFS file is needed from the user.
    */
   noAssetExtraction?: boolean;
+
+  /**
+   * When true, launches with `--gpu_plugin xenos` to use the Xenia renderer.
+   */
+  useXenosRenderer?: boolean;
 
   /**
    * Configurable cvars exposed to the player as a settings panel on the

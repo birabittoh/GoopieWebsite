@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   description: ReactNode;
   confirmLabel: string;
   confirmIcon?: ReactNode;
+  confirmClassName?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -25,6 +26,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   confirmIcon,
+  confirmClassName,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -51,7 +53,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             onClick={onConfirm}
-            className="gap-2 bg-[#8b1a1a] hover:bg-[#a52525] text-white border-0"
+            className={confirmClassName ?? "gap-2 bg-[#8b1a1a] hover:bg-[#a52525] text-white border-0"}
           >
             {confirmIcon}
             {confirmLabel}
