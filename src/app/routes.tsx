@@ -19,6 +19,7 @@ const Downloads = lazy(() => import('./pages/Downloads').then(m => ({ default: m
 const VehicleBrowser = lazy(() => import('./pages/VehicleBrowser').then(m => ({ default: m.VehicleBrowser })));
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 const MarkdownReference = lazy(() => import('./pages/MarkdownReference').then(m => ({ default: m.MarkdownReference })));
+const GameEditorPage = lazy(() => import('./pages/GameEditorPage').then(m => ({ default: m.GameEditorPage })));
 
 function isInCEF(): boolean {
   return typeof (window as any)?.GetPlatform === 'function';
@@ -111,6 +112,18 @@ export const router = createHashRouter([
   {
     path: '/markdown-reference',
     Component: withSuspense(MarkdownReference),
+  },
+  {
+    path: '/game-editor',
+    Component: withSuspense(GameEditorPage),
+  },
+  {
+    path: '/game-editor/:recompName',
+    Component: withSuspense(GameEditorPage),
+  },
+  {
+    path: '/game-editor/:recompName/preview',
+    Component: withSuspense(GameEditorPage),
   },
   {
     path: '*',

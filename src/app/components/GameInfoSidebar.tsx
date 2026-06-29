@@ -1,5 +1,6 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import type { Game } from '../types/game';
+import { useGameDevelopers } from '../data/useGameDevelopers';
 
 const statusColors: Record<Game['status'], string> = {
   Featured: 'bg-purple-600 text-white',
@@ -34,6 +35,8 @@ export function GameInfoSidebar({
   setCvarValue: (id: string, value: any) => void;
   resetCvar: (id: string) => void;
 }) {
+  const assignedDevs = useGameDevelopers(game.id);
+
   return (
     <div className="space-y-6">
       {/* Game Info */}
@@ -45,8 +48,38 @@ export function GameInfoSidebar({
             <div style={{ color: 'var(--theme-text-primary)' }}>{game.og_developer}</div>
           </div>
           <div>
-            <div className="text-sm mb-1" style={{ color: 'var(--theme-text-muted)' }}>Recompiled By</div>
-            <div style={{ color: 'var(--theme-text-primary)' }}>{game.recompiled_developers.join(', ')}</div>
+            <div className="text-sm mb-2" style={{ color: 'var(--theme-text-muted)' }}>Recompiled By</div>
+            <div className="space-y-2">
+              {/* Linked user accounts — shown with avatar */}
+              {assignedDevs.map(dev => (
+                <div key={dev.uid} className="flex items-center gap-2">
+                  {dev.picture ? (
+                    <img
+                      src={dev.picture}
+                      alt={dev.username}
+                      className="w-6 h-6 rounded-full shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold text-white"
+                      style={{ backgroundColor: 'var(--theme-item-selected)' }}
+                    >
+                      {dev.username[0]?.toUpperCase()}
+                    </div>
+                  )}
+                  <span className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>{dev.username}</span>
+                </div>
+              ))}
+              {/* Manually entered names */}
+              {game.recompiled_developers.length > 0 && (
+                <div className="text-sm" style={{ color: 'var(--theme-text-primary)' }}>
+                  {game.recompiled_developers.join(', ')}
+                </div>
+              )}
+              {assignedDevs.length === 0 && game.recompiled_developers.length === 0 && (
+                <div className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>—</div>
+              )}
+            </div>
           </div>
           <div>
             <div className="text-sm mb-1" style={{ color: 'var(--theme-text-muted)' }}>Status</div>

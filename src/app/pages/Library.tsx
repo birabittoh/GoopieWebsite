@@ -2,9 +2,8 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { GameList } from '../components/GameList';
 import { TopBar } from '../components/TopBar';
 import { Sidebar, SIDEBAR_WIDTH_CLASS } from '../components/Sidebar';
-import { GameEditor } from '../components/GameEditor';
 import { Pencil, ArrowLeft } from 'lucide-react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useNavigate } from 'react-router';
 import { Game, Platform } from '../types/game';
 import { useAuth } from '../auth/AuthContext';
 import { useGameStore } from '../data/GameStore';
@@ -37,8 +36,9 @@ import { GameManageModal } from '../components/GameManageModal';
 
 export function Library() {
   const { recompName: urlRecompName } = useParams<{ recompName: string }>();
-  const { user, canEditGame, assignGame } = useAuth();
-  const { games, saveGame, deleteGame, getVisibleGames } = useGameStore();
+  const navigate = useNavigate();
+  const { user, canEditGame } = useAuth();
+  const { games, saveGame, getVisibleGames } = useGameStore();
   const { gameRatings, userRatings, rateGame } = useRatings(user?.uid);
   const { isFavorite, toggleFavorite, favorites, reorderFavorites } = useFavorites(user?.uid);
   const { recordSession } = usePlaytime(user?.uid);
@@ -55,10 +55,6 @@ export function Library() {
   const [audioMuted, setAudioMuted] = useState(() => {
     try { return localStorage.getItem('goopie:audioMuted') === '1'; } catch { return false; }
   });
-  const [editingGame, setEditingGame] = useState<Game | null>(null);
-  const [showEditor, setShowEditor] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const isTauri = isInTauriLauncher();
   const isLegacyLauncher = isInLauncher() && !isTauri;
   const [chosenAudioUrl, setChosenAudioUrl] = useState<string | undefined>(undefined);
@@ -481,11 +477,14 @@ export function Library() {
   } : null;
 
   const openEditor = useCallback((game: Game | null, creating: boolean, previewing: boolean) => {
-    setEditingGame(game);
-    setIsCreating(creating);
-    setIsPreviewing(previewing);
-    setShowEditor(true);
-  }, []);
+    if (creating) {
+      navigate('/game-editor');
+    } else if (previewing && game) {
+      navigate(`/game-editor/${game.recompName}/preview`);
+    } else if (game) {
+      navigate(`/game-editor/${game.recompName}`);
+    }
+  }, [navigate]);
 
   return (
     <div className={`flex h-screen flex-col relative ${SIDEBAR_WIDTH_CLASS}`} style={{ backgroundColor: 'var(--theme-page-bg)' }}>
@@ -643,25 +642,6 @@ export function Library() {
             await saveGame({ ...selectedGame, description });
           }}
           onClose={() => setEditingDescription(false)}
-        />
-      )}
-
-      {/* Game Editor Modal */}
-      {showEditor && (
-        <GameEditor
-          game={editingGame}
-          isNew={isCreating}
-          readOnly={isPreviewing}
-          onSave={async (game) => {
-            await saveGame(game);
-            if (isCreating && user?.role === 'developer') {
-              await assignGame(user.uid, game.id);
-            }
-            setShowEditor(false);
-            setSelectedGameId(game.id);
-          }}
-          onDelete={(id) => { deleteGame(id); setShowEditor(false); setSelectedGameId(null); }}
-          onClose={() => { setShowEditor(false); setIsPreviewing(false); }}
         />
       )}
 

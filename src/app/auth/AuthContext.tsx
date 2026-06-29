@@ -249,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const snap = await getDoc(userRef);
       if (!snap.exists()) return 'User not found';
       const data = snap.data();
-      if (data.role !== 'developer') return 'User must be a developer';
+      if (data.role !== 'developer' && data.role !== 'admin') return 'User must be a developer or admin';
       const existing: string[] = data.assignedGames || [];
       if (!existing.includes(gameId)) {
         await updateDoc(userRef, { assignedGames: [...existing, gameId] });
