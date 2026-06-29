@@ -204,20 +204,36 @@ export function Library() {
   });
 
   // --- Auto-play from --play CLI flag ---
+  // On launchers < 1.5.0: read the auto-play flag once on mount.
+  // On launchers >= 1.5.0: poll continuously so a second-instance shortcut
+  // forwarded via the single-instance plugin is picked up while already open.
   const autoPlayRef = useRef<string | null | undefined>(undefined);
+  const canPollAutoPlay = isLauncherVersionAtLeast('1.5.0');
   useEffect(() => {
-    // First render: read the auto-play flag once.
+    const w = window as any;
+    if (typeof w.getAutoPlayGame !== 'function') return;
+
+    const check = () => {
+      // Only pick up a new auto-play request when idle (no pending request).
+      if (autoPlayRef.current) return;
+      const game = w.getAutoPlayGame();
+      if (!game) return;
+      autoPlayRef.current = game;
+      if (typeof w.clearAutoPlayGame === 'function') w.clearAutoPlayGame();
+      const found = visibleGames.find(g => g.recompName === game);
+      if (found) setSelectedGameId(found.id);
+    };
+
+    // Always run once on mount.
     if (autoPlayRef.current === undefined) {
-      const w = window as any;
-      const game = typeof w.getAutoPlayGame === 'function' ? w.getAutoPlayGame() : null;
-      autoPlayRef.current = game || null;
-      if (game) {
-        // Select the game so builds load.
-        const found = visibleGames.find(g => g.recompName === game);
-        if (found) setSelectedGameId(found.id);
-      }
+      autoPlayRef.current = null; // mark as initialized
+      check();
     }
-  }, [visibleGames]);
+
+    if (!canPollAutoPlay) return;
+    const interval = setInterval(check, 1000);
+    return () => clearInterval(interval);
+  }, [visibleGames, canPollAutoPlay]);
 
   useEffect(() => {
     if (!autoPlayRef.current) return;
