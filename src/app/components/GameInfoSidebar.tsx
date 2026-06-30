@@ -1,4 +1,5 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Game } from '../types/game';
 import { useGameDevelopers } from '../data/useGameDevelopers';
 import type { GamePlaytime } from '../data/usePlaytime';
@@ -165,6 +166,23 @@ export function GameInfoSidebar({
                           style={{ backgroundColor: value ? 'var(--theme-accent)' : 'var(--theme-item-selected)' }}
                         />
                       </label>
+                    ) : cv.type === 'Enum' ? (
+                      <Select
+                        value={String(value)}
+                        onValueChange={v => setCvarValue(cv.id, v)}
+                        disabled={!isInCEF}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          className="rounded border text-sm"
+                          style={{ backgroundColor: 'var(--theme-page-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}>
+                          {(cv.options ?? []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <input
                         id={`cvar-${cv.id}`}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CVar } from '../types/game';
 
-export type CVarValue = number | boolean;
+export type CVarValue = number | boolean | string;
 
 const STORAGE_PREFIX = 'goopie:cvars:';
 
@@ -24,6 +24,11 @@ function loadStored(gameId: string): Record<string, CVarValue> {
 function coerce(cvar: CVar, raw: CVarValue | undefined): CVarValue {
   if (raw === undefined || raw === null) return cvar.defaultValue;
   if (cvar.type === 'Bool') return Boolean(raw);
+  if (cvar.type === 'Enum') {
+    const opts = cvar.options ?? [];
+    const s = String(raw);
+    return opts.includes(s) ? s : cvar.defaultValue;
+  }
   const n = typeof raw === 'number' ? raw : Number(raw);
   if (!isFinite(n)) return cvar.defaultValue;
   return cvar.type === 'Int' ? Math.trunc(n) : n;
@@ -31,6 +36,7 @@ function coerce(cvar: CVar, raw: CVarValue | undefined): CVarValue {
 
 function formatArg(cvar: CVar, value: CVarValue): string {
   if (cvar.type === 'Bool') return Boolean(value) ? 'true' : 'false';
+  if (cvar.type === 'Enum') return String(value);
   if (cvar.type === 'Int') return String(Math.trunc(Number(value)));
   // Float — keep finite numeric formatting (avoid trailing exponent).
   const n = Number(value);
