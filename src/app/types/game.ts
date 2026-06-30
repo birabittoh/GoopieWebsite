@@ -156,6 +156,15 @@ export interface Game {
    * launch command passed to the launcher.
    */
   cvars?: CVar[];
+
+  /**
+   * When true, the launcher shows its own Discord Rich Presence
+   * ("Playing <title>") while this game runs. Defaults to false because many
+   * games set their own Rich Presence, which the launcher's would otherwise
+   * clobber. When false, the launcher shows no activity while the game runs
+   * and reverts to "Browsing games" once it closes.
+   */
+  discordPresenceEnabled?: boolean;
 }
 
 export type CVarType = 'Int' | 'Float' | 'Bool';

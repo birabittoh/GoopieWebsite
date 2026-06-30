@@ -103,8 +103,8 @@ export function EditorVisuals({ form, update, readOnly }: Props) {
         />
         <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
           Used for desktop shortcut icons and Discord Rich Presence. Falls back to the icon
-          extracted from the game's XEX. Discord Rich Presence falls back to the title image,
-          then the default Goopie logo.
+          extracted from the game's XEX for shortcuts. Discord Rich Presence falls back to
+          the default Goopie logo when unset.
         </p>
       </div>
 

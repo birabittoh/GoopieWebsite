@@ -42,6 +42,20 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
         description={form.noAssetExtraction ? '— Skips ISO/STFS extraction; build download only' : '— Requires user to provide game files'}
         disabled={readOnly}
       />
+      <EditorToggle
+        checked={form.discordPresenceEnabled === true}
+        onChange={v => update('discordPresenceEnabled', v || undefined)}
+        label="Discord Rich Presence"
+        description={form.discordPresenceEnabled
+          ? '— Launcher shows "Playing <title>" on Discord while this game runs'
+          : '— Off: the game handles its own Discord presence'}
+        disabled={readOnly}
+      />
+      {form.discordPresenceEnabled === true && !form.iconUrl && (
+        <p className="text-xs mt-1" style={{ color: '#d97706' }}>
+          No Icon URL set — Discord will show the default Goopie icon. Set an Icon URL in Visuals to use a custom image.
+        </p>
+      )}
       <div>
         <label className={labelClass} style={labelStyle}>External Launcher URL (optional)</label>
         <Input
