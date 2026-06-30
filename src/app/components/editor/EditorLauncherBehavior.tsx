@@ -56,6 +56,15 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
           No Icon URL set — Discord will show the default Goopie icon. Set an Icon URL in Visuals to use a custom image.
         </p>
       )}
+      <EditorToggle
+        checked={form.achievementsEnabled === true}
+        onChange={v => update('achievementsEnabled', v || undefined)}
+        label="Achievements"
+        description={form.achievementsEnabled
+          ? '— Achievement list shown in the Manage tab'
+          : '— Off: achievements tab is hidden'}
+        disabled={readOnly}
+      />
       <div>
         <label className={labelClass} style={labelStyle}>External Launcher URL (optional)</label>
         <Input

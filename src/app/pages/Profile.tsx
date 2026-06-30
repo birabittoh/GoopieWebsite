@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Game } from '../types/game';
 import { useAuth, type Role, type DeveloperRequest, type DeletionRequest } from '../auth/AuthContext';
 import { useGameStore } from '../data/GameStore';
+import { useAchievementStats } from '../data/useAchievementStats';
 
 const statusColors: Record<Game['status'], string> = {
   Featured: 'bg-purple-600 text-white',
@@ -38,6 +39,8 @@ export function Profile() {
   const totalGames = games.length;
 
   const pendingGames = useMemo(() => games.filter(g => g.pendingApproval && !g.isPublic), [games]);
+
+  const achievementStats = useAchievementStats(games);
 
   const filteredUsers = useMemo(() => {
     if (!userSearch.trim()) return allUsers;
@@ -155,11 +158,20 @@ export function Profile() {
                   Request Account Deletion
                 </Button>
               </div>
-              <div className="flex gap-6">
-                <div>
-                  
+              {achievementStats && (
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2" style={{ color: 'var(--theme-text-primary)' }}>
+                    <Trophy className="w-5 h-5" style={{ color: '#f5c518' }} />
+                    <span className="font-bold">{achievementStats.earnedScore}G</span>
+                    <span className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                      gamer cred
+                      {achievementStats.total > 0 && (
+                        <> &middot; {achievementStats.unlocked}/{achievementStats.total} achievements</>
+                      )}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

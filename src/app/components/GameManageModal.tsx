@@ -11,6 +11,7 @@ import {
 } from './ui/dialog';
 import type { Game } from '../types/game';
 import { SaveManagerPanel } from './SaveManagerPanel';
+import { AchievementsPanel } from './AchievementsPanel';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface InstalledDlc {
@@ -42,7 +43,12 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
   const showSavesTab = !game.disableSaveManager;
   const showShortcutRow = isLauncherVersionAtLeast('1.5.0') && !!onCreateShortcut;
-  const useTabs = showAssetsTab && showSavesTab;
+  const showAchievementsTab =
+    isLauncherVersionAtLeast('1.5.2') &&
+    !!game.achievementsEnabled &&
+    typeof (window as any).getAchievements === 'function';
+  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab].filter(Boolean).length;
+  const useTabs = visiblePanelCount > 1;
 
   const refresh = useCallback(() => {
     const w = window as any;
@@ -268,20 +274,36 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
           </DialogHeader>
 
           {useTabs ? (
-            <Tabs defaultValue="assets">
+            <Tabs defaultValue={showAssetsTab ? 'assets' : showSavesTab ? 'saves' : 'achievements'}>
               <TabsList style={{ backgroundColor: 'var(--theme-item-default)' }}>
-                <TabsTrigger value="assets" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Assets</TabsTrigger>
-                <TabsTrigger value="saves" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Saves</TabsTrigger>
+                {showAssetsTab && (
+                  <TabsTrigger value="assets" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Assets</TabsTrigger>
+                )}
+                {showSavesTab && (
+                  <TabsTrigger value="saves" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Saves</TabsTrigger>
+                )}
+                {showAchievementsTab && (
+                  <TabsTrigger value="achievements" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Achievements</TabsTrigger>
+                )}
               </TabsList>
-              <TabsContent value="assets">{assetsPanel}</TabsContent>
-              <TabsContent value="saves">
-                <SaveManagerPanel recompName={game.recompName} />
-              </TabsContent>
+              {showAssetsTab && <TabsContent value="assets">{assetsPanel}</TabsContent>}
+              {showSavesTab && (
+                <TabsContent value="saves">
+                  <SaveManagerPanel recompName={game.recompName} />
+                </TabsContent>
+              )}
+              {showAchievementsTab && (
+                <TabsContent value="achievements">
+                  <AchievementsPanel recompName={game.recompName} />
+                </TabsContent>
+              )}
             </Tabs>
           ) : showAssetsTab ? (
             assetsPanel
           ) : showSavesTab ? (
             <SaveManagerPanel recompName={game.recompName} />
+          ) : showAchievementsTab ? (
+            <AchievementsPanel recompName={game.recompName} />
           ) : null}
         </DialogContent>
       </Dialog>

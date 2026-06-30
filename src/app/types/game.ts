@@ -165,6 +165,14 @@ export interface Game {
    * and reverts to "Browsing games" once it closes.
    */
   discordPresenceEnabled?: boolean;
+
+  /**
+   * When true, the launcher surfaces this game's achievement system in the
+   * Manage tab. Defaults to false.
+   * Achievement metadata is extracted from the game's assets/default.xex
+   * and unlock state is read from the ReXGlue runtime's achievement folder.
+   */
+  achievementsEnabled?: boolean;
 }
 
 export type CVarType = 'Int' | 'Float' | 'Bool';
