@@ -1,8 +1,9 @@
 import type React from 'react';
 
-export function EditorSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function EditorSection({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
     <div
+      id={id}
       className="rounded-lg border p-6 space-y-5"
       style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)' }}
     >

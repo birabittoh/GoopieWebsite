@@ -51,9 +51,16 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
           : '— Off: the game handles its own Discord presence'}
         disabled={readOnly}
       />
-      {form.discordPresenceEnabled === true && !form.iconUrl && (
+      {form.discordPresenceEnabled === true && !form.discordIconUrl && (
         <p className="text-xs mt-1" style={{ color: '#d97706' }}>
-          No Icon URL set — Discord will show the default Goopie icon. Set an Icon URL in Visuals to use a custom image.
+          No Discord Rich Presence Icon URL set. Discord will show the default Goopie icon.{' '}
+          <button type="button" className="underline hover:opacity-70 text-xs" onClick={() => {
+            const el = document.getElementById('visuals');
+            const container = el?.closest('.overflow-y-auto');
+            if (el && container) {
+              container.scrollTo({ top: el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop, behavior: 'smooth' });
+            }
+          }}>Set one in Visuals</button> to use a custom image.
         </p>
       )}
       <EditorToggle

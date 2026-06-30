@@ -23,7 +23,7 @@ export function EditorVisuals({ form, update, readOnly }: Props) {
   };
 
   return (
-    <EditorSection title="Visuals">
+    <EditorSection title="Visuals" id="visuals">
       <div>
         <label className={labelClass} style={labelStyle}>Cover Image URL *</label>
         <Input
@@ -93,7 +93,7 @@ export function EditorVisuals({ form, update, readOnly }: Props) {
       </div>
 
       <div>
-        <label className={labelClass} style={labelStyle}>Icon URL (optional)</label>
+        <label className={labelClass} style={labelStyle}>Shortcut Icon URL (optional)</label>
         <Input
           value={form.iconUrl || ''}
           onChange={e => update('iconUrl', e.target.value || undefined)}
@@ -102,9 +102,21 @@ export function EditorVisuals({ form, update, readOnly }: Props) {
           disabled={readOnly}
         />
         <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
-          Used for desktop shortcut icons and Discord Rich Presence. Falls back to the icon
-          extracted from the game's XEX for shortcuts. Discord Rich Presence falls back to
-          the default Goopie logo when unset.
+          Used for desktop shortcut icons. Falls back to the icon extracted from the game's XEX when unset.
+        </p>
+      </div>
+
+      <div>
+        <label className={labelClass} style={labelStyle}>Discord Rich Presence Icon URL (optional)</label>
+        <Input
+          value={form.discordIconUrl || ''}
+          onChange={e => update('discordIconUrl', e.target.value || undefined)}
+          placeholder="https://..."
+          style={inputStyle}
+          disabled={readOnly}
+        />
+        <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+          Square image shown in Discord Rich Presence while the game runs. Falls back to the default Goopie icon when unset.
         </p>
       </div>
 

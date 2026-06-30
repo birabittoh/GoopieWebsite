@@ -19,6 +19,9 @@ export interface Game {
   /** URL of an icon image used for desktop/application shortcuts. When unset,
    *  the launcher extracts one from the game's default.xex. */
   iconUrl?: string;
+  /** URL of an icon image shown in Discord Rich Presence as the large image.
+   *  When unset, Discord falls back to the application's default icon. */
+  discordIconUrl?: string;
   description: string;
   isPublic?: boolean;
   pendingApproval?: boolean;

@@ -393,8 +393,7 @@ export function Settings() {
           <section>
             <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Discord Rich Presence</h2>
             <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
-              Shows what you're doing on your Discord profile — "Browsing games" while the
-              launcher is open, or "Playing &lt;game&gt;" while one is running.
+              Shows what you're doing as your Discord profile activity.
             </p>
 
             <div
