@@ -1,6 +1,21 @@
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import type { Game } from '../types/game';
 import { useGameDevelopers } from '../data/useGameDevelopers';
+import type { GamePlaytime } from '../data/usePlaytime';
+
+/** Formats whole seconds as a compact human-readable duration, e.g. "3h 5m". */
+function formatPlaytime(seconds: number): string {
+  if (seconds < 60) return '< 1m';
+  const totalMinutes = Math.round(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function formatLastPlayed(date: Date): string {
+  return date.toLocaleDateString();
+}
 
 const statusColors: Record<Game['status'], string> = {
   Featured: 'bg-purple-600 text-white',
@@ -28,12 +43,14 @@ export function GameInfoSidebar({
   getCvarValue,
   setCvarValue,
   resetCvar,
+  playtime,
 }: {
   game: Game;
   isInCEF: boolean;
   getCvarValue: (cv: NonNullable<Game['cvars']>[number]) => any;
   setCvarValue: (id: string, value: any) => void;
   resetCvar: (id: string) => void;
+  playtime?: GamePlaytime | null;
 }) {
   const assignedDevs = useGameDevelopers(game.id);
 
@@ -98,16 +115,16 @@ export function GameInfoSidebar({
               <div style={{ color: 'var(--theme-text-primary)' }}>{game.xexVersion}</div>
             </div>
           )}
-          {game.xexSha256 && (
+          {playtime && playtime.totalSeconds > 0 && (
             <div>
-              <div className="text-sm mb-1" style={{ color: 'var(--theme-text-muted)' }}>XEX SHA256</div>
-              <div
-                className="font-mono text-xs break-all select-all"
-                style={{ color: 'var(--theme-text-primary)' }}
-                title={game.xexSha256}
-              >
-                {game.xexSha256}
-              </div>
+              <div className="text-sm mb-1" style={{ color: 'var(--theme-text-muted)' }}>Total Playtime</div>
+              <div style={{ color: 'var(--theme-text-primary)' }}>{formatPlaytime(playtime.totalSeconds)}</div>
+            </div>
+          )}
+          {playtime && playtime.totalSeconds > 0 && playtime.lastPlayedAt && (
+            <div>
+              <div className="text-sm mb-1" style={{ color: 'var(--theme-text-muted)' }}>Last Played</div>
+              <div style={{ color: 'var(--theme-text-primary)' }}>{formatLastPlayed(playtime.lastPlayedAt)}</div>
             </div>
           )}
         </div>

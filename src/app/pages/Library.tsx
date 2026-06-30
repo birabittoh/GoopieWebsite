@@ -41,7 +41,7 @@ export function Library() {
   const { games, saveGame, getVisibleGames } = useGameStore();
   const { gameRatings, userRatings, rateGame } = useRatings(user?.uid);
   const { isFavorite, toggleFavorite, favorites, reorderFavorites } = useFavorites(user?.uid);
-  const { recordSession } = usePlaytime(user?.uid);
+  const { recordSession, getPlaytime } = usePlaytime(user?.uid);
   const { posts: newsPosts } = useNews();
   const { theme } = useTheme();
   const { setAccentColor } = useBackgroundAccent();
@@ -635,6 +635,7 @@ export function Library() {
                     getCvarValue={getCvarValue}
                     setCvarValue={setCvarValue}
                     resetCvar={resetCvar}
+                    playtime={getPlaytime(selectedGame.id)}
                   />
                 </div>
               </div>
