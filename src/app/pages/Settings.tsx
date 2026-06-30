@@ -50,6 +50,7 @@ export function Settings() {
   const [userLanguage, setUserLanguage] = useState<number>(1);
   const [showFps, setShowFps] = useState<boolean>(() => getFpsEnabled());
   const [offline, setOffline] = useState<boolean | null>(null);
+  const [discordPresence, setDiscordPresence] = useState<boolean | null>(null);
   const [reachable, setReachable] = useState(true);
   const launcherVersion = getLauncherVersion();
   const w = window as any;
@@ -91,6 +92,9 @@ export function Settings() {
     }
     if (typeof w.isOfflineMode === 'function') {
       setOffline(Boolean(w.isOfflineMode()));
+    }
+    if (typeof w.getDiscordPresenceEnabled === 'function') {
+      setDiscordPresence(Boolean(w.getDiscordPresenceEnabled()));
     }
     if (isLinuxLauncher) {
       if (typeof w.getProtonInstallations === 'function') {
@@ -375,6 +379,55 @@ export function Settings() {
                 <span
                   className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
                   style={{ transform: offline ? 'translateX(22px)' : 'translateX(3px)' }}
+                />
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Discord Rich Presence section — only meaningful inside a Tauri
+            launcher new enough to expose the getDiscordPresenceEnabled bridge
+            command (feature-detected on top of the version gate so the row
+            never appears on a launcher build that predates this feature). */}
+        {isInTauriLauncher() && isLauncherVersionAtLeast('1.5.2') && typeof w.getDiscordPresenceEnabled === 'function' && discordPresence !== null && (
+          <section>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Discord Rich Presence</h2>
+            <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
+              Shows what you're doing on your Discord profile — "Browsing games" while the
+              launcher is open, or "Playing &lt;game&gt;" while one is running.
+            </p>
+
+            <div
+              className="rounded-xl border-2 p-5 flex items-center justify-between gap-4"
+              style={{
+                borderColor: 'var(--theme-border)',
+                backgroundColor: 'var(--theme-card-bg)',
+                backdropFilter: 'var(--theme-backdrop-blur)',
+                WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+              }}
+            >
+              <div className="min-w-0">
+                <div className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                  {discordPresence ? 'Discord Rich Presence is on' : 'Discord Rich Presence is off'}
+                </div>
+              </div>
+              <button
+                role="switch"
+                aria-checked={discordPresence}
+                onClick={() => {
+                  const next = !discordPresence;
+                  setDiscordPresence(next);
+                  w.setDiscordPresenceEnabled(next);
+                }}
+                className="shrink-0 relative inline-flex items-center h-7 w-12 rounded-full transition-colors"
+                style={{
+                  backgroundColor: discordPresence ? 'var(--theme-accent)' : 'var(--theme-item-default)',
+                  border: '1px solid var(--theme-border)',
+                }}
+              >
+                <span
+                  className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
+                  style={{ transform: discordPresence ? 'translateX(22px)' : 'translateX(3px)' }}
                 />
               </button>
             </div>
