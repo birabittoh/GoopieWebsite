@@ -334,9 +334,21 @@ export function Library() {
     setPendingRemoveBuild(null);
   }, [selectedGame, pendingRemoveBuild, selectedBuild, setSelectedTag, setSelectedAsset, installation]);
 
-  const removeAssets = useCallback(() => {
+  const removeAssets = useCallback((force?: boolean) => {
     if (!selectedGame) return;
     const w = window as any;
+    if (force) {
+      if (installation.updateInstalled && typeof w.RemoveUpdate === 'function') {
+        w.RemoveUpdate(selectedGame.recompName);
+      }
+      if (installation.dlcInstalled && typeof w.getInstalledDlc === 'function' && typeof w.RemoveDlc === 'function') {
+        const raw = w.getInstalledDlc(selectedGame.recompName);
+        const dlc = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+        for (const d of dlc) {
+          w.RemoveDlc(selectedGame.recompName, d.title_id, d.hash);
+        }
+      }
+    }
     if (typeof w.RemoveAssets !== 'function') return;
     w.RemoveAssets(selectedGame.recompName);
     installation.checkState();

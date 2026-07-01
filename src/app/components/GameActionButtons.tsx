@@ -45,7 +45,8 @@ export interface GameActionButtonsProps {
   onRequestPlay: (build: InstalledBuild) => void;
   onCloseRunningGame: () => void;
   onRemoveBuild: (build: InstalledBuild) => void;
-  onRemoveAssets: () => void;
+  /** Pass `force: true` to also remove the installed title update and DLC first. */
+  onRemoveAssets: (force?: boolean) => void;
   onSwitchToInstalledBuild: (build: InstalledBuild) => void;
   onOpenManage?: () => void;
   updateInstalled?: boolean;
@@ -110,6 +111,7 @@ export function GameActionButtons({
   versionPicker,
 }: GameActionButtonsProps) {
   const [showTuDialog, setShowTuDialog] = useState(false);
+  const [showRemoveAssetsDialog, setShowRemoveAssetsDialog] = useState(false);
   const btnPx = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg';
   const btnPxSm = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg';
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5';
@@ -213,8 +215,17 @@ export function GameActionButtons({
                 <Download className={`${iconSize} ${iconMr}`} /> {selectedBuild ? 'Update' : 'Install'}
               </Button>
             )}
-            {installedBuilds.length === 0 && isoInstalled && !updateInstalled && !dlcInstalled && (
-              <Button className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`} onClick={onRemoveAssets}>
+            {installedBuilds.length === 0 && isoInstalled && (
+              <Button
+                className={`bg-[#8b1a1a] hover:bg-[#a52525] text-white ${btnPxSm}`}
+                onClick={() => {
+                  if (updateInstalled || dlcInstalled) {
+                    setShowRemoveAssetsDialog(true);
+                  } else {
+                    onRemoveAssets();
+                  }
+                }}
+              >
                 <Trash2 className={`${iconSize} ${iconMr}`} /> Remove assets
               </Button>
             )}
@@ -273,6 +284,22 @@ export function GameActionButtons({
       confirmClassName="gap-2 bg-[#1a6bc4] hover:bg-[#2080e0] text-white border-0"
       onConfirm={() => { setShowTuDialog(false); onOpenManage?.(); }}
       onCancel={() => setShowTuDialog(false)}
+    />
+    <ConfirmDialog
+      open={showRemoveAssetsDialog}
+      title="Remove assets?"
+      description={
+        <>
+          This game has {updateInstalled && dlcInstalled ? 'a title update and DLC' : updateInstalled ? 'a title update' : 'DLC'} installed,
+          which won't work without the assets. Do you also want to remove{' '}
+          {updateInstalled && dlcInstalled ? 'the title update and DLC' : updateInstalled ? 'the title update' : 'the DLC'}?
+        </>
+      }
+      confirmLabel="Delete"
+      confirmIcon={<Trash2 className="w-4 h-4" />}
+      confirmClassName="gap-2 bg-[#8b1a1a] hover:bg-[#a52525] text-white border-0"
+      onConfirm={() => { setShowRemoveAssetsDialog(false); onRemoveAssets(true); }}
+      onCancel={() => setShowRemoveAssetsDialog(false)}
     />
   </>
   );
