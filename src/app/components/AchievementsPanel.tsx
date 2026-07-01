@@ -17,8 +17,14 @@ interface AchievementsPanelProps {
   recompName: string;
 }
 
+/// Bit 3 of the XACH `flags` field: XACHIEVEMENT_DETAILS_SHOWUNACHIEVED.
+/// When clear, the achievement is secret/hidden and should stay obscured
+/// until the player unlocks it or clicks to reveal it early.
+const FLAG_SHOW_UNACHIEVED = 0x8;
+
 export function AchievementsPanel({ recompName }: AchievementsPanelProps) {
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
+  const [revealed, setRevealed] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const w = window as any;
@@ -26,6 +32,18 @@ export function AchievementsPanel({ recompName }: AchievementsPanelProps) {
     const result = w.getAchievements(recompName);
     setAchievements(Array.isArray(result) ? result : []);
   }, [recompName]);
+
+  const toggleReveal = (id: number) => {
+    setRevealed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   if (achievements === null) {
     return (
@@ -80,48 +98,69 @@ export function AchievementsPanel({ recompName }: AchievementsPanelProps) {
 
       {/* Achievement list */}
       <div className="space-y-2">
-        {achievements.map(a => (
-          <div
-            key={a.id}
-            className="flex items-center gap-3 p-3 rounded-lg"
-            style={{
-              backgroundColor: 'var(--theme-item-default)',
-              opacity: a.unlocked ? 1 : 0.6,
-            }}
-          >
-            {/* Icon */}
-            <div className="shrink-0 w-10 h-10 flex items-center justify-center overflow-hidden">
-              {a.iconDataUrl ? (
-                <img src={a.iconDataUrl} alt="" className="w-10 h-10 object-cover" />
-              ) : a.unlocked ? (
-                <Trophy className="w-5 h-5" style={{ color: '#f5c518' }} />
-              ) : (
-                <Lock className="w-5 h-5" style={{ color: 'var(--theme-text-muted)' }} />
-              )}
-            </div>
+        {achievements.map(a => {
+          const isSecret = (a.flags & FLAG_SHOW_UNACHIEVED) === 0;
+          const obscured = isSecret && !a.unlocked && !revealed.has(a.id);
 
-            {/* Text */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--theme-text-primary)' }}>
-                {a.label}
-              </p>
-              <p className="text-xs break-words" style={{ color: 'var(--theme-text-muted)' }}>
-                {a.unlocked ? a.description : a.unachievedDescription}
-              </p>
-            </div>
-
-            {/* Gamerscore badge */}
-            <span
-              className="shrink-0 text-xs font-bold px-1.5 py-0.5 rounded"
+          return (
+            <div
+              key={a.id}
+              className="flex items-center gap-3 p-3 rounded-lg"
               style={{
-                backgroundColor: a.unlocked ? '#f5c518' : 'var(--theme-item-selected)',
-                color: a.unlocked ? '#1a1a1a' : 'var(--theme-text-muted)',
+                backgroundColor: 'var(--theme-item-default)',
+                opacity: a.unlocked ? 1 : 0.6,
+                cursor: obscured || (isSecret && revealed.has(a.id) && !a.unlocked) ? 'pointer' : undefined,
               }}
+              role={isSecret && !a.unlocked ? 'button' : undefined}
+              tabIndex={isSecret && !a.unlocked ? 0 : undefined}
+              onClick={isSecret && !a.unlocked ? () => toggleReveal(a.id) : undefined}
+              onKeyDown={
+                isSecret && !a.unlocked
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleReveal(a.id);
+                      }
+                    }
+                  : undefined
+              }
             >
-              {a.gamerscore}G
-            </span>
-          </div>
-        ))}
+              {/* Icon */}
+              <div className="shrink-0 w-10 h-10 flex items-center justify-center overflow-hidden">
+                {obscured ? (
+                  <Lock className="w-5 h-5" style={{ color: 'var(--theme-text-muted)' }} />
+                ) : a.iconDataUrl ? (
+                  <img src={a.iconDataUrl} alt="" className="w-10 h-10 object-cover" />
+                ) : a.unlocked ? (
+                  <Trophy className="w-5 h-5" style={{ color: '#f5c518' }} />
+                ) : (
+                  <Lock className="w-5 h-5" style={{ color: 'var(--theme-text-muted)' }} />
+                )}
+              </div>
+
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--theme-text-primary)' }}>
+                  {obscured ? 'Hidden Achievement' : a.label}
+                </p>
+                <p className="text-xs break-words" style={{ color: 'var(--theme-text-muted)' }}>
+                  {obscured ? 'Click to reveal' : (a.unlocked ? a.description : a.unachievedDescription)}
+                </p>
+              </div>
+
+              {/* Gamerscore badge */}
+              <span
+                className="shrink-0 text-xs font-bold px-1.5 py-0.5 rounded"
+                style={{
+                  backgroundColor: a.unlocked ? '#f5c518' : 'var(--theme-item-selected)',
+                  color: a.unlocked ? '#1a1a1a' : 'var(--theme-text-muted)',
+                }}
+              >
+                {a.gamerscore}G
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
