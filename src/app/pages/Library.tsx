@@ -7,6 +7,7 @@ import { Link, useParams, useNavigate } from 'react-router';
 import { Game, Platform } from '../types/game';
 import { useAuth } from '../auth/AuthContext';
 import { useGameStore } from '../data/GameStore';
+import { useFocusedGame } from '../data/FocusedGameContext';
 import { useRatings } from '../data/useRatings';
 import { useFavorites } from '../data/useFavorites';
 import { usePlaytime } from '../data/usePlaytime';
@@ -147,6 +148,16 @@ export function Library() {
   }, [selectedGameId, visibleGames, filteredGames, urlRecompName]);
 
   const selectedGame = visibleGames.find(g => g.id === selectedGameId);
+
+  // Publish the selected game to the global drop handler (mounted above the
+  // router, so it can't read our local `selectedGameId`) — see
+  // FocusedGameContext for why. Cleared on unmount so a drop on some other
+  // route (e.g. Settings) isn't mistakenly attributed to the last-viewed game.
+  const { setFocusedGame } = useFocusedGame();
+  useEffect(() => {
+    setFocusedGame(selectedGame?.recompName ?? null);
+    return () => setFocusedGame(null);
+  }, [selectedGame?.recompName, setFocusedGame]);
 
   const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs } =
     useCvarSettings(selectedGame?.id, selectedGame?.cvars);

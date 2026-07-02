@@ -92,7 +92,10 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   }, [game.recompName, game.updateChecksum, game.xexSha256, dlcNames, allowUpdate]);
 
   useEffect(() => {
-    if (!open || !showAssetsTab) return;
+    // 1.6.0+ launchers handle every drop globally via FileDropManager
+    // (any screen, whole-catalogue matching) — this modal-local listener is
+    // only needed as a fallback for older launchers that lack `ProcessDrops`.
+    if (!open || !showAssetsTab || isLauncherVersionAtLeast('1.6.0')) return;
     const onFileDrop = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.paths) handleFileDrop(detail.paths);
