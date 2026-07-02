@@ -18,6 +18,11 @@ interface ConfirmDialogProps {
   confirmClassName?: string;
   onCancel: () => void;
   onConfirm: () => void;
+  /** Optional third action rendered between Cancel and Confirm. */
+  extraLabel?: string;
+  extraIcon?: ReactNode;
+  extraClassName?: string;
+  onExtra?: () => void;
 }
 
 export function ConfirmDialog({
@@ -29,6 +34,10 @@ export function ConfirmDialog({
   confirmClassName,
   onCancel,
   onConfirm,
+  extraLabel,
+  extraIcon,
+  extraClassName,
+  onExtra,
 }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
@@ -51,6 +60,16 @@ export function ConfirmDialog({
           >
             Cancel
           </Button>
+          {extraLabel && onExtra && (
+            <Button
+              onClick={onExtra}
+              className={extraClassName ?? "gap-2 border-0"}
+              style={extraClassName ? undefined : { backgroundColor: 'var(--theme-accent)', color: 'white' }}
+            >
+              {extraIcon}
+              {extraLabel}
+            </Button>
+          )}
           <Button
             onClick={onConfirm}
             className={confirmClassName ?? "gap-2 bg-[#8b1a1a] hover:bg-[#a52525] text-white border-0"}

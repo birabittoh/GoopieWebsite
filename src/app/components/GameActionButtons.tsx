@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -111,6 +111,25 @@ export function GameActionButtons({
   versionPicker,
 }: GameActionButtonsProps) {
   const [showTuDialog, setShowTuDialog] = useState(false);
+
+  // Only relevant when the TU is optional — if it's required, no installed
+  // build will ever be able to skip it, so there's nothing to fall back to.
+  const noTuFallbackBuild = useMemo(() => {
+    if (game.updateStatus !== 'optional' || !selectedBuild) return null;
+    const withoutTu = (b: typeof installedBuilds[number]) =>
+      b.name !== selectedBuild.name && !updateRequiredForBuild(game, b.asset || b.name);
+
+    // Prefer another installed build of the very same version (different asset/platform).
+    const sameVersion = installedBuilds.find(b => b.version === selectedBuild.version && withoutTu(b));
+    if (sameVersion) return sameVersion;
+
+    // Only once every build of the current version requires the TU do we look
+    // backwards through older installed versions (installedBuilds is sorted
+    // newest-first) for the closest one that doesn't need it.
+    const currentIndex = installedBuilds.findIndex(b => b.name === selectedBuild.name);
+    const older = currentIndex >= 0 ? installedBuilds.slice(currentIndex + 1) : [];
+    return older.find(b => b.version !== selectedBuild.version && withoutTu(b)) ?? null;
+  }, [game, installedBuilds, selectedBuild]);
   const [showRemoveAssetsDialog, setShowRemoveAssetsDialog] = useState(false);
   const btnPx = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-8 md:py-6 text-sm md:text-lg';
   const btnPxSm = compact ? 'px-4 py-2 text-sm' : 'px-4 py-3 md:px-6 md:py-6 text-sm md:text-lg';
@@ -279,11 +298,14 @@ export function GameActionButtons({
     <ConfirmDialog
       open={showTuDialog}
       title=""
-      description={<>This build requires the title update to be installed. You can install it from the Manage panel.{game.updateStatus === 'optional' && <><br />Another build may be available that does not require the title update.</>}</>}
+      description={<>This build requires the title update to be installed. You can install it from the Manage panel.{noTuFallbackBuild && <><br />Or switch to {noTuFallbackBuild.version || noTuFallbackBuild.name}, which doesn't need it.</>}</>}
       confirmLabel="Install it"
       confirmClassName="gap-2 bg-[#1a6bc4] hover:bg-[#2080e0] text-white border-0"
       onConfirm={() => { setShowTuDialog(false); onOpenManage?.(); }}
       onCancel={() => setShowTuDialog(false)}
+      extraLabel={noTuFallbackBuild ? `Switch to ${noTuFallbackBuild.version || noTuFallbackBuild.name}` : undefined}
+      extraIcon={<RotateCcw className="w-4 h-4" />}
+      onExtra={noTuFallbackBuild ? () => { setShowTuDialog(false); onSwitchToInstalledBuild(noTuFallbackBuild); } : undefined}
     />
     <ConfirmDialog
       open={showRemoveAssetsDialog}
