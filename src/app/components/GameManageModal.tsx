@@ -78,18 +78,18 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
   const handleInstallAssetPick = useCallback(() => {
     const w = window as any;
     if (w.InstallAssetPick) {
-      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, true, allowUpdate);
+      w.InstallAssetPick(game.recompName, game.updateChecksum || '', dlcNames, true, allowUpdate, game.xexSha256 || '');
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
+  }, [game.recompName, game.updateChecksum, game.xexSha256, dlcNames, allowUpdate]);
 
   const handleFileDrop = useCallback((paths: string[]) => {
     const w = window as any;
     if (w.InstallAssetFiles && paths.length > 0) {
-      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames, allowUpdate);
+      w.InstallAssetFiles(game.recompName, paths, game.updateChecksum || '', dlcNames, allowUpdate, game.xexSha256 || '');
       setExtracting(true);
     }
-  }, [game.recompName, game.updateChecksum, dlcNames, allowUpdate]);
+  }, [game.recompName, game.updateChecksum, game.xexSha256, dlcNames, allowUpdate]);
 
   useEffect(() => {
     if (!open || !showAssetsTab) return;
