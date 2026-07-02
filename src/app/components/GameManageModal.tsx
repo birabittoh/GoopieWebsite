@@ -26,13 +26,13 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
-  onCreateShortcut?: () => void;
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCreateShortcut }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
-  const [shortcutCreated, setShortcutCreated] = useState(false);
+  const [desktopShortcutCreated, setDesktopShortcutCreated] = useState(false);
+  const [appShortcutCreated, setAppShortcutCreated] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ type: string; label: string; onConfirm: () => void } | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
   const dlcNames = game.dlcNames || [];
   const showAssetsTab = isLauncherVersionAtLeast('1.4.0');
   const showSavesTab = !game.disableSaveManager;
-  const showShortcutRow = isLauncherVersionAtLeast('1.5.0') && !!onCreateShortcut;
+  const showShortcutRow = isLauncherVersionAtLeast('1.5.3');
   const showAchievementsTab =
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
@@ -62,7 +62,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
       const err = w.getExtractError();
       if (err) setExtractError(err);
     }
-    if (w.shortcutExists) setShortcutCreated(!!w.shortcutExists(game.recompName, game.title));
+    if (w.desktopShortcutExists) setDesktopShortcutCreated(!!w.desktopShortcutExists(game.recompName, game.title));
+    if (w.appShortcutExists) setAppShortcutCreated(!!w.appShortcutExists(game.recompName, game.title));
   }, [game.recompName, game.title]);
 
   useEffect(() => {
@@ -152,6 +153,39 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
         </div>
       )}
 
+      {/* Shortcut row */}
+      {showShortcutRow && (
+        <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-sm" style={{ color: 'var(--theme-text-primary)' }}>Shortcuts</p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Desktop</span>
+                {desktopShortcutCreated ? (
+                  <>
+                    <Check className="w-3 h-3 text-green-400" />
+                    <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => { const w = window as any; if (w.RemoveDesktopShortcut) w.RemoveDesktopShortcut(game.recompName, game.title); setTimeout(refresh, 500); }}><Trash2 className="w-3 h-3" /></Button>
+                  </>
+                ) : (
+                  <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => { const w = window as any; if (w.CreateDesktopShortcut) w.CreateDesktopShortcut(game.recompName, game.title, game.iconUrl || ''); setTimeout(refresh, 500); }}><Link className="w-3 h-3" /></Button>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Applications</span>
+                {appShortcutCreated ? (
+                  <>
+                    <Check className="w-3 h-3 text-green-400" />
+                    <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => { const w = window as any; if (w.RemoveAppShortcut) w.RemoveAppShortcut(game.recompName, game.title); setTimeout(refresh, 500); }}><Trash2 className="w-3 h-3" /></Button>
+                  </>
+                ) : (
+                  <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => { const w = window as any; if (w.CreateAppShortcut) w.CreateAppShortcut(game.recompName, game.title, game.iconUrl || ''); setTimeout(refresh, 500); }}><Link className="w-3 h-3" /></Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Update row — show when not hidden, or when hidden but already installed */}
       {(updateStatus !== 'hidden' || updateInstalled) && (
         <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
@@ -174,26 +208,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, onCr
               ) : (
                 <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstallAssetPick} disabled={extracting}>
                   <Download className="w-3 h-3 mr-1" /> Browse...
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Shortcut row */}
-      {showShortcutRow && (
-        <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold text-sm" style={{ color: 'var(--theme-text-primary)' }}>Shortcut</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {shortcutCreated ? (
-                <span className="text-xs flex items-center gap-1 text-green-400"><Check className="w-3 h-3" /> Created.</span>
-              ) : (
-                <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => { onCreateShortcut(); setTimeout(refresh, 500); }}>
-                  <Link className="w-3 h-3 mr-1" /> Create
                 </Button>
               )}
             </div>

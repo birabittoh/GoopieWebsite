@@ -108,14 +108,6 @@ export function useRunningGame({
     playBuild(build);
   }, [pendingPlayBuild, closeRunningGame, playBuild]);
 
-  /** Create a desktop/application-menu shortcut for the selected game. */
-  const createShortcut = useCallback(() => {
-    if (!selectedGame) return;
-    const w = window as any;
-    if (typeof w.CreateShortcut !== 'function') return;
-    w.CreateShortcut(selectedGame.recompName, selectedGame.title, selectedGame.iconUrl || '');
-  }, [selectedGame]);
-
   const runningBuildForSelectedGame = (selectedGame && runningGame && runningGame.game === selectedGame.recompName)
     ? runningGame.build
     : null;
@@ -133,7 +125,6 @@ export function useRunningGame({
     runningBuildForSelectedGame,
     isSelectedBuildRunning,
     requestPlay,
-    createShortcut,
     closeRunningGame,
     confirmCloseAndPlay,
   };

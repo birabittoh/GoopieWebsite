@@ -712,7 +712,6 @@ export function Library() {
           onClose={() => setShowManageModal(false)}
           canEdit={canEditGame(selectedGame.id)}
           onSaveGame={saveGame}
-          onCreateShortcut={runningGameHook.createShortcut}
         />
       )}
     </div>
