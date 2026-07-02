@@ -7,7 +7,6 @@ interface CrossfadeSlot {
 export function useHeaderCrossfade(
   selectedGameId: string | undefined,
   headerImages: string[],
-  isTauri: boolean,
 ) {
   const [headerIdx, setHeaderIdx] = useState(0);
   const [slotA, setSlotA] = useState<CrossfadeSlot>({ src: '' });
@@ -47,5 +46,5 @@ export function useHeaderCrossfade(
     return () => clearInterval(timer);
   }, [headerImages.length]);
 
-  return { slotA, slotB, activeSlot, isTauri };
+  return { slotA, slotB, activeSlot };
 }

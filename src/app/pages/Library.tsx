@@ -182,7 +182,7 @@ export function Library() {
     return Array.isArray(selectedGame.headerImage) ? selectedGame.headerImage : [selectedGame.headerImage];
   }, [selectedGame]);
 
-  const crossfade = useHeaderCrossfade(selectedGame?.id, headerImages, isTauri);
+  const crossfade = useHeaderCrossfade(selectedGame?.id, headerImages);
 
   const installation = useGameInstallation({
     selectedGame,
@@ -584,7 +584,6 @@ export function Library() {
                 slotA={crossfade.slotA}
                 slotB={crossfade.slotB}
                 activeSlot={crossfade.activeSlot}
-                isTauri={isTauri}
                 isInCEF={isInCEF}
                 openExternal={openExternal}
                 canEdit={canEditGame(selectedGame.id)}

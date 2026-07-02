@@ -13,7 +13,6 @@ interface GameDetailHeaderProps {
   slotA: CrossfadeSlot;
   slotB: CrossfadeSlot;
   activeSlot: 'A' | 'B';
-  isTauri: boolean;
   isInCEF: boolean;
   openExternal: (url: string) => void;
   canEdit: boolean;
@@ -37,7 +36,6 @@ export function GameDetailHeader({
   slotA,
   slotB,
   activeSlot,
-  isTauri,
   isInCEF,
   openExternal,
   canEdit,
@@ -74,7 +72,7 @@ export function GameDetailHeader({
             className="absolute inset-0 w-full h-full object-cover"
             style={{
               opacity: activeSlot === id ? (('var(--theme-header-alpha)' as unknown) as number) : 0,
-              transition: isTauri ? undefined : 'opacity 1s ease-in-out',
+              transition: 'opacity 1s ease-in-out',
             }}
           />
           ) : null
