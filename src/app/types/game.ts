@@ -176,6 +176,15 @@ export interface Game {
    * and unlock state is read from the ReXGlue runtime's achievement folder.
    */
   achievementsEnabled?: boolean;
+
+  /**
+   * When true, the launcher surfaces a Mods tab in the Manage modal for this
+   * game, letting players enable/disable/reorder/remove mods and install new
+   * ones (Browse or drag-and-drop of `.zip` files). Defaults to false.
+   * Mods live under `<games>/<recompName>/mods/` on disk, entirely managed by
+   * the launcher — Goopie stores no mod data itself.
+   */
+  modsEnabled?: boolean;
 }
 
 export type CVarType = 'Int' | 'Float' | 'Bool' | 'Enum';

@@ -12,6 +12,7 @@ import {
 import type { Game } from '../types/game';
 import { SaveManagerPanel } from './SaveManagerPanel';
 import { AchievementsPanel } from './AchievementsPanel';
+import { ModsPanel } from './ModsPanel';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface InstalledDlc {
@@ -19,6 +20,9 @@ interface InstalledDlc {
   title_id: string;
   name: string;
 }
+
+// Remembered in-memory only (not persisted) — resets on launcher restart.
+let lastManageTab: string | null = null;
 
 interface GameManageModalProps {
   game: Game;
@@ -47,7 +51,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
     typeof (window as any).getAchievements === 'function';
-  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab].filter(Boolean).length;
+  const showModsTab =
+    isLauncherVersionAtLeast('1.6.0') &&
+    !!game.modsEnabled &&
+    typeof (window as any).getMods === 'function';
+  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showModsTab].filter(Boolean).length;
   const useTabs = visiblePanelCount > 1;
 
   const refresh = useCallback(() => {
@@ -291,7 +299,17 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
           </DialogHeader>
 
           {useTabs ? (
-            <Tabs defaultValue={showAssetsTab ? 'assets' : showSavesTab ? 'saves' : 'achievements'}>
+            <Tabs
+              defaultValue={
+                (lastManageTab === 'assets' && showAssetsTab) ||
+                (lastManageTab === 'saves' && showSavesTab) ||
+                (lastManageTab === 'achievements' && showAchievementsTab) ||
+                (lastManageTab === 'mods' && showModsTab)
+                  ? lastManageTab
+                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'mods'
+              }
+              onValueChange={v => { lastManageTab = v; }}
+            >
               <TabsList style={{ backgroundColor: 'var(--theme-item-default)' }}>
                 {showAssetsTab && (
                   <TabsTrigger value="assets" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Assets</TabsTrigger>
@@ -301,6 +319,9 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
                 )}
                 {showAchievementsTab && (
                   <TabsTrigger value="achievements" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Achievements</TabsTrigger>
+                )}
+                {showModsTab && (
+                  <TabsTrigger value="mods" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Mods</TabsTrigger>
                 )}
               </TabsList>
               {showAssetsTab && <TabsContent value="assets">{assetsPanel}</TabsContent>}
@@ -314,6 +335,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
                   <AchievementsPanel recompName={game.recompName} />
                 </TabsContent>
               )}
+              {showModsTab && (
+                <TabsContent value="mods">
+                  <ModsPanel recompName={game.recompName} />
+                </TabsContent>
+              )}
             </Tabs>
           ) : showAssetsTab ? (
             assetsPanel
@@ -321,6 +347,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
             <SaveManagerPanel recompName={game.recompName} />
           ) : showAchievementsTab ? (
             <AchievementsPanel recompName={game.recompName} />
+          ) : showModsTab ? (
+            <ModsPanel recompName={game.recompName} />
           ) : null}
         </DialogContent>
       </Dialog>

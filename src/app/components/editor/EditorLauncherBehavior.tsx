@@ -72,6 +72,15 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
           : '— Off: achievements tab is hidden'}
         disabled={readOnly}
       />
+      <EditorToggle
+        checked={form.modsEnabled === true}
+        onChange={v => update('modsEnabled', v || undefined)}
+        label="Mods"
+        description={form.modsEnabled
+          ? '— Mods tab shown in the Manage modal; players can install/enable/reorder mods'
+          : '— Off: mods tab is hidden'}
+        disabled={readOnly}
+      />
       <div>
         <label className={labelClass} style={labelStyle}>External Launcher URL (optional)</label>
         <Input

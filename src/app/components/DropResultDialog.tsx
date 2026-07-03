@@ -12,7 +12,7 @@ import { Button } from './ui/button';
 
 export interface DropItem {
   file: string;
-  kind: 'base' | 'update' | 'dlc' | 'unknown';
+  kind: 'base' | 'update' | 'dlc' | 'mod' | 'unknown';
   status: 'installed' | 'ignored' | 'error';
   game: string | null;
   gameTitle: string | null;
@@ -33,6 +33,7 @@ const KIND_LABEL: Record<DropItem['kind'], string> = {
   base: 'Game',
   update: 'Update',
   dlc: 'DLC',
+  mod: 'Mod',
   unknown: 'File',
 };
 
