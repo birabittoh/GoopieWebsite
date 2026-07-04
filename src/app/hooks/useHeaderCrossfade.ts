@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { isTauriLinuxLauncher } from '../utils/externalLink';
 
 interface CrossfadeSlot {
   src: string;
@@ -22,6 +23,19 @@ export function useHeaderCrossfade(
   useEffect(() => {
     const src = headerImages[headerIdx];
     if (!src) return;
+
+    // The opacity-transition crossfade breaks on the Tauri Linux launcher's
+    // WebKitGTK webview, so just swap the single slot in place there instead
+    // of staging the incoming image in the other slot and waiting to decode.
+    if (isTauriLinuxLauncher()) {
+      pendingCrossfadeRef.current++;
+      setSlotA({ src });
+      setSlotB({ src: '' });
+      activeSlotRef.current = 'A';
+      setActiveSlot('A');
+      return;
+    }
+
     const token = ++pendingCrossfadeRef.current;
     const incoming: 'A' | 'B' = activeSlotRef.current === 'A' ? 'B' : 'A';
     if (incoming === 'A') setSlotA({ src }); else setSlotB({ src });

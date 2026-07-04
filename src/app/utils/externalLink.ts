@@ -24,6 +24,17 @@ export function isInTauriLauncher(): boolean {
 }
 
 /**
+ * Returns true when running inside the Tauri GoopieLauncher on Linux.
+ * The header image crossfade (opacity transition between two stacked <img>
+ * layers) breaks on the Linux WebKitGTK webview, so callers use this to
+ * fall back to a hard image swap instead.
+ */
+export function isTauriLinuxLauncher(): boolean {
+  const w = window as any;
+  return isInTauriLauncher() && typeof w.GetPlatform === 'function' && w.GetPlatform() === 'Linux';
+}
+
+/**
  * Memoized result of the last `window.isOfflineMode()` bridge call (see below).
  * `undefined` until first computed.
  */

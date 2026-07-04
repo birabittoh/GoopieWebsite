@@ -3,6 +3,7 @@ import type { Game } from '../types/game';
 import { StarRating } from './StarRating';
 import { GameActionButtons, type GameActionButtonsProps } from './GameActionButtons';
 import { SupportLinks, SocialLinkIcons } from './SocialLinks';
+import { isTauriLinuxLauncher } from '../utils/externalLink';
 
 interface CrossfadeSlot {
   src: string;
@@ -72,7 +73,7 @@ export function GameDetailHeader({
             className="absolute inset-0 w-full h-full object-cover"
             style={{
               opacity: activeSlot === id ? (('var(--theme-header-alpha)' as unknown) as number) : 0,
-              transition: 'opacity 1s ease-in-out',
+              transition: isTauriLinuxLauncher() ? 'none' : 'opacity 1s ease-in-out',
             }}
           />
           ) : null
