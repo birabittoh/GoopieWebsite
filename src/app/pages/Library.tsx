@@ -42,7 +42,7 @@ export function Library() {
   const { games, saveGame, getVisibleGames } = useGameStore();
   const { gameRatings, userRatings, rateGame } = useRatings(user?.uid);
   const { isFavorite, toggleFavorite, favorites, reorderFavorites } = useFavorites(user?.uid);
-  const { recordSession, getPlaytime } = usePlaytime(user?.uid);
+  const { getPlaytime } = usePlaytime();
   const { posts: newsPosts } = useNews();
   const { theme } = useTheme();
   const { setAccentColor } = useBackgroundAccent();
@@ -207,9 +207,7 @@ export function Library() {
   });
 
   const runningGameHook = useRunningGame({
-    games,
     selectedGame,
-    recordSession,
     buildCvarArgs,
     setAudioMuted,
     // The Play button is never disabled for a broken mod layout — instead,
@@ -668,7 +666,7 @@ export function Library() {
                     getCvarValue={getCvarValue}
                     setCvarValue={setCvarValue}
                     resetCvar={resetCvar}
-                    playtime={getPlaytime(selectedGame.id)}
+                    playtime={getPlaytime(selectedGame.recompName)}
                   />
                 </div>
               </div>

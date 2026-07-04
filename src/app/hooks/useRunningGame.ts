@@ -4,9 +4,7 @@ import type { InstalledBuild } from '../data/useGameReleases';
 import { shouldMountUpdate } from '../utils/updateRequired';
 
 interface UseRunningGameOptions {
-  games: Game[];
   selectedGame: Game | undefined;
-  recordSession: (gameId: string, seconds: number) => Promise<void>;
   buildCvarArgs: () => string;
   setAudioMuted: (value: boolean) => void;
   /**
@@ -19,15 +17,13 @@ interface UseRunningGameOptions {
 }
 
 export function useRunningGame({
-  games,
   selectedGame,
-  recordSession,
   buildCvarArgs,
   setAudioMuted,
   onModsInvalid,
 }: UseRunningGameOptions) {
   const [runningGame, setRunningGame] = useState<{ game: string; build: string } | null>(null);
-  const runningGameRef = useRef<{ game: string; build: string; secondsPlayed: number } | null>(null);
+  const runningGameRef = useRef<{ game: string; build: string } | null>(null);
   const [pendingPlayBuild, setPendingPlayBuild] = useState<InstalledBuild | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
@@ -42,20 +38,14 @@ export function useRunningGame({
     if (typeof w.getRunningGame !== 'function') return;
     const poll = () => {
       const running = w.getRunningGame();
-      const prev = runningGameRef.current;
       const next = running
-        ? { game: String(running.game), build: String(running.build), secondsPlayed: Number(running.secondsPlayed) || 0 }
+        ? { game: String(running.game), build: String(running.build) }
         : null;
-
-      if (prev && (prev.game !== next?.game || prev.build !== next?.build)) {
-        const finishedGame = games.find(g => g.recompName === prev.game);
-        if (finishedGame) void recordSession(finishedGame.id, prev.secondsPlayed);
-      }
 
       runningGameRef.current = next;
       setRunningGame(prevState => {
         if (prevState?.game === next?.game && prevState?.build === next?.build) return prevState;
-        return next ? { game: next.game, build: next.build } : null;
+        return next;
       });
 
       if (typeof w.getLaunchError === 'function') {
@@ -66,7 +56,7 @@ export function useRunningGame({
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [games, recordSession]);
+  }, []);
 
   /** Assemble the full cvar args string (base cvars + XBLA + Xenos flags). */
   const composeCvarArgs = useCallback((): string => {
