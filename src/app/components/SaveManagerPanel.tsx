@@ -361,23 +361,28 @@ export function SaveManagerPanel({ recompName }: SaveManagerPanelProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Open save folder button */}
-      {(window as any).openSaveFolder && (
-        <div className="flex justify-end mb-3">
+      {/* Open folder buttons */}
+      <div className="flex justify-between mb-3 gap-2">
+        {(window as any).openSaveFolder && (
           <Button variant="ghost" size="sm" onClick={() => (window as any).openSaveFolder(recompName)} className="gap-1" style={{ color: 'var(--theme-text-muted)' }}>
-            <FolderOpen className="w-3 h-3" /> Open Save Folder
+            <FolderOpen className="w-3 h-3" /> Saves
           </Button>
-        </div>
-      )}
+        )}
+        {(window as any).openBackupsFolder && (
+          <Button variant="ghost" size="sm" onClick={() => (window as any).openBackupsFolder(recompName)} className="gap-1" style={{ color: 'var(--theme-text-muted)' }}>
+            <FolderOpen className="w-3 h-3" /> Backups
+          </Button>
+        )}
+      </div>
 
       {/* Save slots list */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>Save Slots ({slots.length})</h3>
+          <h3 className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>Backups ({slots.length})</h3>
           <Button variant="ghost" size="icon" onClick={refreshSlots} style={{ color: 'var(--theme-text-muted)' }}><RefreshCw className="w-3 h-3" /></Button>
         </div>
         {slots.length === 0 ? (
-          <p className="text-center py-6 text-sm" style={{ color: 'var(--theme-text-muted)' }}>No save slots yet. Create a backup above.</p>
+          <p className="text-center py-6 text-sm" style={{ color: 'var(--theme-text-muted)' }}>No backups yet. Create one above.</p>
         ) : (
           <div className="space-y-1">
             {slots.map(slot => (
