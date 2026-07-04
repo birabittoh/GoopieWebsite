@@ -163,6 +163,20 @@ export function Library() {
     return () => setFocusedGame(null);
   }, [selectedGame?.recompName, setFocusedGame]);
 
+  // Pull the latest cloud save (if enabled for this game) whenever its page
+  // is opened — a no-op on the Rust side (no network call at all) unless
+  // cloud saves are actually enabled, see `cloud_saves::sync_on_open`. The
+  // matching push happens automatically when the game closes.
+  useEffect(() => {
+    const recompName = selectedGame?.recompName;
+    if (!recompName) return;
+    if (!isLauncherVersionAtLeast('1.6.1')) return;
+    const w = window as any;
+    if (typeof w.syncCloudSaveOnOpen === 'function') {
+      w.syncCloudSaveOnOpen(recompName);
+    }
+  }, [selectedGame?.recompName]);
+
   const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs } =
     useCvarSettings(selectedGame?.id, selectedGame?.cvars);
 

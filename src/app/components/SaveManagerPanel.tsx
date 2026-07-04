@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Save, Upload, Trash2, RefreshCw, Plus, Pencil, Check, X, FolderOpen, FilePlus } from 'lucide-react';
+import { Save, Upload, Trash2, RefreshCw, Plus, Pencil, Check, X, FolderOpen, FilePlus, Cloud } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Switch } from './ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface SaveSlot {
   name: string;
@@ -17,6 +19,28 @@ interface SaveSlot {
 
 interface SaveManagerPanelProps {
   recompName: string;
+}
+
+interface CloudSaveStatus {
+  enabled: boolean;
+  signedIn: boolean;
+  lastSyncedAt: number;
+  syncing: boolean;
+  error: string | null;
+}
+
+/// Coarse "5 minutes ago" / "3 hours ago" style formatting for the cloud-sync
+/// status line — precision doesn't matter here, just a rough sense of freshness.
+function formatRelativeTime(epochSeconds: number): string {
+  if (!epochSeconds) return 'never';
+  const diffSeconds = Math.max(0, Date.now() / 1000 - epochSeconds);
+  if (diffSeconds < 60) return 'just now';
+  const minutes = Math.floor(diffSeconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 export function SaveManagerPanel({ recompName }: SaveManagerPanelProps) {
@@ -39,6 +63,64 @@ export function SaveManagerPanel({ recompName }: SaveManagerPanelProps) {
     if (messageTimeout.current) clearTimeout(messageTimeout.current);
     messageTimeout.current = setTimeout(() => setMessage(null), 3000);
   }, []);
+
+  // ── Cloud saves (Google Drive) ──────────────────────────────────────────────
+  // Gated on 1.6.1 — the same release that ships the bridge commands this UI
+  // calls (see shim.js). Old launchers simply don't render this section.
+  const cloudSupported = isLauncherVersionAtLeast('1.6.1') && typeof (window as any).getCloudSaveStatus === 'function';
+  const [cloudStatus, setCloudStatus] = useState<CloudSaveStatus | null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
+
+  useEffect(() => {
+    if (!cloudSupported || !recompName) return;
+    const poll = () => {
+      const s = (window as any).getCloudSaveStatus(recompName);
+      if (s) setCloudStatus(s);
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [cloudSupported, recompName]);
+
+  const handleToggleCloudSave = useCallback(async (next: boolean) => {
+    if (!recompName) return;
+    setCloudBusy(true);
+    const w = window as any;
+    try {
+      let result = w.setCloudSaveEnabled(recompName, next);
+      if (next && result?.needsConsent) {
+        w.cloudSaveSignIn();
+        // Poll the system-browser consent flow (mirrors the GoogleSignIn
+        // pattern) until it resolves or times out.
+        const deadline = Date.now() + 5 * 60 * 1000;
+        let signIn = w.getCloudSaveSignInResult();
+        while (signIn?.status === 'pending' || signIn?.status === 'idle') {
+          if (Date.now() > deadline) {
+            showMessage('Cloud save sign-in timed out', 'error');
+            setCloudBusy(false);
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+          signIn = w.getCloudSaveSignInResult();
+        }
+        if (signIn?.status !== 'ok') {
+          showMessage(signIn?.message || 'Cloud save sign-in failed', 'error');
+          setCloudBusy(false);
+          return;
+        }
+        result = w.setCloudSaveEnabled(recompName, true);
+      }
+      if (result?.ok) {
+        setCloudStatus(w.getCloudSaveStatus(recompName));
+        showMessage(next ? 'Cloud saves enabled' : 'Cloud saves disabled', 'success');
+      } else {
+        showMessage('Could not update cloud saves', 'error');
+      }
+    } catch {
+      showMessage('Could not update cloud saves', 'error');
+    }
+    setCloudBusy(false);
+  }, [recompName, showMessage]);
 
   const refreshSlots = useCallback(() => {
     if (!recompName || !isInCEF) return;
@@ -176,6 +258,34 @@ export function SaveManagerPanel({ recompName }: SaveManagerPanelProps) {
       {message && (
         <div className={`mb-4 px-4 py-3 rounded-lg text-sm font-medium ${message.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
           {message.text}
+        </div>
+      )}
+
+      {/* Cloud saves */}
+      {cloudSupported && (
+        <div className="p-4 rounded-lg mb-4" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Cloud className="w-4 h-4 shrink-0" style={{ color: 'var(--theme-text-primary)' }} />
+              <div className="min-w-0">
+                <p className="text-sm font-bold" style={{ color: 'var(--theme-text-primary)' }}>Cloud Saves</p>
+                <p className="text-xs truncate" style={{ color: 'var(--theme-text-muted)' }}>
+                  {cloudStatus?.enabled
+                    ? cloudStatus.syncing
+                      ? 'Syncing…'
+                      : cloudStatus.error
+                        ? `Sync error: ${cloudStatus.error}`
+                        : `Last synced ${formatRelativeTime(cloudStatus.lastSyncedAt)}`
+                    : 'Automatically back up your save to Google Drive'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={!!cloudStatus?.enabled}
+              disabled={cloudBusy}
+              onCheckedChange={handleToggleCloudSave}
+            />
+          </div>
         </div>
       )}
 
