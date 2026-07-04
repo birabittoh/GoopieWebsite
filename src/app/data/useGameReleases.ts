@@ -561,13 +561,13 @@ export function useGameReleases(game: Game | undefined) {
 
   const setSelectedTag = useCallback((tag: string | undefined) => {
     setSelectedTagState(tag);
-    if (game) saveSelection(game.id, { tag, asset: selectedAsset });
-  }, [game, selectedAsset]);
+    if (game) saveSelection(game.id, { ...loadSelection(game.id), tag });
+  }, [game]);
 
   const setSelectedAsset = useCallback((asset: string | undefined) => {
     setSelectedAssetState(asset);
-    if (game) saveSelection(game.id, { tag: selectedTag, asset });
-  }, [game, selectedTag]);
+    if (game) saveSelection(game.id, { ...loadSelection(game.id), asset });
+  }, [game]);
 
   return {
     repo,
