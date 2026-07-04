@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { isInTauriLauncher } from '../utils/externalLink';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 /**
  * App-wide launcher self-update state, surfaced as the "update available" icon
@@ -84,9 +85,20 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
       return;
     }
     const w = window as any;
+    // `getLauncherUpdateProgress`/`-String` (1.6.1+) track the self-update
+    // download separately from a game's own download progress. Older
+    // launchers only have the shared `getDownloadProgress`/`-String`, which
+    // also drives the game page's "updating" progress bar — falling back to
+    // it here is the best an old binary can do until it updates past 1.6.1.
+    const useOwnProgress = isLauncherVersionAtLeast('1.6.1') && typeof w.getLauncherUpdateProgress === 'function';
     progressPollRef.current = setInterval(() => {
-      setDownloadProgress(w.getDownloadProgress ? w.getDownloadProgress() : 0);
-      setDownloadString(w.getDownloadString ? w.getDownloadString() : '');
+      if (useOwnProgress) {
+        setDownloadProgress(w.getLauncherUpdateProgress());
+        setDownloadString(w.getLauncherUpdateProgressString ? w.getLauncherUpdateProgressString() : '');
+      } else {
+        setDownloadProgress(w.getDownloadProgress ? w.getDownloadProgress() : 0);
+        setDownloadString(w.getDownloadString ? w.getDownloadString() : '');
+      }
     }, PROGRESS_POLL_MS);
     return () => {
       if (progressPollRef.current) clearInterval(progressPollRef.current);
