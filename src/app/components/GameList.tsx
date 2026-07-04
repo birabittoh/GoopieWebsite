@@ -29,7 +29,7 @@ const statusDescriptions: Record<Game['status'], string> = {
 const ALL_STATUSES: Game['status'][] = ['Featured', 'Enhanced', 'Playable', 'Gameplay', 'Loads', 'Unplayable', 'Unknown'];
 const ALL_PLATFORMS: Platform[] = ['Windows', 'Linux', 'Mac'];
 
-const PlatformIcon = ({ platform, className }: { platform: Platform; className?: string }) => {
+export const PlatformIcon = ({ platform, className }: { platform: Platform; className?: string }) => {
   switch (platform) {
     case 'Windows':
       return (

@@ -30,9 +30,11 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
+  /** Opens directly on this tab (e.g. routing here from a failed launch due to an invalid mod layout), overriding `lastManageTab` for this one open. */
+  initialTab?: 'assets' | 'saves' | 'achievements' | 'mods';
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, initialTab }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
   const [desktopShortcutCreated, setDesktopShortcutCreated] = useState(false);
@@ -51,8 +53,13 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
     typeof (window as any).getAchievements === 'function';
+  // 1.6.1, not 1.6.0: 1.6.0 shipped the Mods tab without dependency/conflict/
+  // platform validation (getModValidation/autoSortMods, and the extra
+  // conflicts/load_after/platform/is_code fields on ModInfo) — rather than
+  // have ModsPanel handle both shapes, gate the whole tab on the version that
+  // has all of it, so ModsPanel can assume those are always present.
   const showModsTab =
-    isLauncherVersionAtLeast('1.6.0') &&
+    isLauncherVersionAtLeast('1.6.1') &&
     !!game.modsEnabled &&
     typeof (window as any).getMods === 'function';
   const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showModsTab].filter(Boolean).length;
@@ -289,7 +296,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     <>
       <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
         <DialogContent
-          className="sm:max-w-lg max-h-[80vh] overflow-y-auto"
+          className="sm:max-w-lg max-h-[80vh] overflow-y-auto overflow-x-hidden"
           style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
         >
           <DialogHeader>
@@ -300,13 +307,16 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
 
           {useTabs ? (
             <Tabs
+              className="min-w-0"
               defaultValue={
-                (lastManageTab === 'assets' && showAssetsTab) ||
-                (lastManageTab === 'saves' && showSavesTab) ||
-                (lastManageTab === 'achievements' && showAchievementsTab) ||
-                (lastManageTab === 'mods' && showModsTab)
-                  ? lastManageTab
-                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'mods'
+                initialTab === 'mods' && showModsTab
+                  ? 'mods'
+                  : (lastManageTab === 'assets' && showAssetsTab) ||
+                    (lastManageTab === 'saves' && showSavesTab) ||
+                    (lastManageTab === 'achievements' && showAchievementsTab) ||
+                    (lastManageTab === 'mods' && showModsTab)
+                    ? lastManageTab
+                    : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'mods'
               }
               onValueChange={v => { lastManageTab = v; }}
             >

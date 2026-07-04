@@ -69,6 +69,10 @@ export function Library() {
   const [editingDescription, setEditingDescription] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
+  // Set right before opening the Manage modal from a blocked Play attempt
+  // (see useRunningGame's onModsInvalid below), so it lands on the Mods tab
+  // instead of whatever tab was last open.
+  const [manageModalInitialTab, setManageModalInitialTab] = useState<'mods' | undefined>(undefined);
   const [pendingRemoveBuild, setPendingRemoveBuild] = useState<{ name: string; version?: string; asset?: string } | null>(null);
   const appliedUrlRef = useMemo(() => ({ current: undefined as string | undefined }), []);
 
@@ -208,6 +212,13 @@ export function Library() {
     recordSession,
     buildCvarArgs,
     setAudioMuted,
+    // The Play button is never disabled for a broken mod layout — instead,
+    // routing straight to the Mods tab (with its "Fix" auto-sort action) is
+    // far more actionable than a plain error banner would be.
+    onModsInvalid: () => {
+      setManageModalInitialTab('mods');
+      setShowManageModal(true);
+    },
   });
 
   // --- Auto-play from --play CLI flag ---
@@ -719,9 +730,10 @@ export function Library() {
         <GameManageModal
           game={selectedGame}
           open={showManageModal}
-          onClose={() => setShowManageModal(false)}
+          onClose={() => { setShowManageModal(false); setManageModalInitialTab(undefined); }}
           canEdit={canEditGame(selectedGame.id)}
           onSaveGame={saveGame}
+          initialTab={manageModalInitialTab}
         />
       )}
     </div>

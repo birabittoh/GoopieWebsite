@@ -9,6 +9,13 @@ interface UseRunningGameOptions {
   recordSession: (gameId: string, seconds: number) => Promise<void>;
   buildCvarArgs: () => string;
   setAudioMuted: (value: boolean) => void;
+  /**
+   * Called instead of launching when the selected game's enabled mods fail
+   * validation (bad order, missing/conflicting dependency, no binary for
+   * this OS, ...) — the Play button itself is never disabled for this; the
+   * caller should open the Mods tab so the player can fix or auto-sort it.
+   */
+  onModsInvalid?: () => void;
 }
 
 export function useRunningGame({
@@ -17,6 +24,7 @@ export function useRunningGame({
   recordSession,
   buildCvarArgs,
   setAudioMuted,
+  onModsInvalid,
 }: UseRunningGameOptions) {
   const [runningGame, setRunningGame] = useState<{ game: string; build: string } | null>(null);
   const runningGameRef = useRef<{ game: string; build: string; secondsPlayed: number } | null>(null);
@@ -88,12 +96,32 @@ export function useRunningGame({
 
   const requestPlay = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;
+
+    // Check mods *before* the "close the running game?" prompt below — no
+    // point asking the player to close their current session only to fail
+    // to launch the new one afterward. The bridge would refuse to launch
+    // anyway (see the Rust-side gate in launch_and_track), but redirecting to
+    // the Mods tab here is far more actionable than a plain error banner.
+    // `getModValidation` only exists on 1.6.1+ launchers, so the `typeof`
+    // check alone is enough to no-op on older ones — no separate version
+    // check needed.
+    if (selectedGame.modsEnabled) {
+      const w = window as any;
+      if (typeof w.getModValidation === 'function') {
+        const validation = w.getModValidation(selectedGame.recompName);
+        if (validation && validation.ok === false) {
+          onModsInvalid?.();
+          return;
+        }
+      }
+    }
+
     if (runningGame && (runningGame.game !== selectedGame.recompName || runningGame.build !== build.name)) {
       setPendingPlayBuild(build);
       return;
     }
     playBuild(build);
-  }, [selectedGame, runningGame, playBuild]);
+  }, [selectedGame, runningGame, playBuild, onModsInvalid]);
 
   const closeRunningGame = useCallback(() => {
     const w = window as any;

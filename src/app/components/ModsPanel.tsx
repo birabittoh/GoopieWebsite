@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FolderOpen, Upload, GripVertical, AlertTriangle, Package, RefreshCw } from 'lucide-react';
+import { Trash2, FolderOpen, Upload, GripVertical, AlertTriangle, Package, RefreshCw, ArrowDownUp, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/button';
+import { Switch } from './ui/switch';
 import { ConfirmDialog } from './ConfirmDialog';
+import { PlatformIcon } from './GameList';
+import type { Platform } from '../types/game';
 
 interface ModInfo {
   id: string;
@@ -10,6 +13,12 @@ interface ModInfo {
   author: string;
   description: string;
   requires: string[];
+  conflicts: string[];
+  load_after: string[];
+  /** Platform target(s) this mod's `code/` ships a binary for (e.g. `["windows-x64", "linux-x64"]`); empty for asset-only mods. */
+  platform: string[];
+  /** `true` when the mod ships a native DLL/SO (declares a `code` stem). */
+  is_code: boolean;
   enabled: boolean;
   /** `data:image/png;base64,...`, or empty when the mod has no icon.png. */
   icon: string;
@@ -19,6 +28,40 @@ interface InstallResult {
   path: string;
   ok: boolean;
   message: string;
+}
+
+interface ModIssue {
+  id: string;
+  kind: 'error' | 'warning';
+  message: string;
+}
+
+interface ModValidation {
+  ok: boolean;
+  issues: ModIssue[];
+}
+
+/** Maps a mod's `platform` entry prefix (`"windows-x64"`, `"linux-x64"`, `"macos-x64"`) to the `Platform` type used throughout the site (game cards, filters, ...). */
+const PLATFORM_PREFIXES: { prefix: string; platform: Platform }[] = [
+  { prefix: 'windows', platform: 'Windows' },
+  { prefix: 'linux', platform: 'Linux' },
+  { prefix: 'macos', platform: 'Mac' },
+];
+
+/** One icon per platform this mod actually ships a binary for, reusing the same `PlatformIcon` glyphs as the game list — nothing rendered for a platform it doesn't support (that's an error, surfaced by the row highlight/banner, not a badge here). */
+function PlatformBadges({ mod }: { mod: ModInfo }) {
+  if (!mod.is_code) return null;
+
+  const supported = PLATFORM_PREFIXES.filter(({ prefix }) => mod.platform.some(p => p.toLowerCase().startsWith(prefix)));
+  if (supported.length === 0) return null;
+
+  return (
+    <span className="flex items-center gap-1.5 shrink-0">
+      {supported.map(({ prefix, platform }) => (
+        <PlatformIcon key={prefix} platform={platform} className="w-3.5 h-3.5" />
+      ))}
+    </span>
+  );
 }
 
 interface ModsPanelProps {
@@ -33,12 +76,16 @@ interface ModsPanelProps {
  * handled globally by FileDropManager, which dispatches `goopie:modschanged`
  * on completion — this panel listens for that to stay in sync.
  *
- * Dependency enforcement (the `requires` field) is deferred: it's surfaced
- * as informational text only, nothing is blocked yet.
+ * `requires`/`conflicts`/`load_after`/platform-availability are validated on
+ * the Rust side (`getModValidation`) against the *enabled* mod set; the same
+ * validation gates Play itself (see `getLaunchError`), so a banner here is
+ * purely proactive — reorder/enable still apply instantly either way.
  */
 export function ModsPanel({ recompName }: ModsPanelProps) {
   const [mods, setMods] = useState<ModInfo[] | null>(null);
+  const [validation, setValidation] = useState<ModValidation | null>(null);
   const [installing, setInstalling] = useState(false);
+  const [sorting, setSorting] = useState(false);
   const [lastReport, setLastReport] = useState<InstallResult[] | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<ModInfo | null>(null);
 
@@ -54,6 +101,10 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
     if (typeof w.getMods !== 'function') return;
     const result = w.getMods(recompName);
     setMods(Array.isArray(result) ? result : []);
+    if (typeof w.getModValidation === 'function') {
+      const v = w.getModValidation(recompName);
+      setValidation(v && Array.isArray(v.issues) ? v : { ok: true, issues: [] });
+    }
   }, [recompName]);
 
   useEffect(() => {
@@ -66,6 +117,15 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
     return () => window.removeEventListener('goopie:modschanged', onChanged);
   }, [fetchMods, recompName]);
 
+  const handleAutoSort = useCallback(() => {
+    const w = window as any;
+    if (typeof w.autoSortMods !== 'function') return;
+    setSorting(true);
+    w.autoSortMods(recompName);
+    fetchMods();
+    setSorting(false);
+  }, [recompName, fetchMods]);
+
   const persist = useCallback((next: ModInfo[]) => {
     setMods(next);
     const w = window as any;
@@ -76,6 +136,13 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
     // double-encodes and the Rust side's serde_json::from_value silently
     // fails (Value::String where a sequence is expected), yielding an empty list.
     w.setModsState(recompName, entries);
+    // Reorder/enable can change whether the layout is valid (order, presence
+    // in the enabled set) — refresh validation immediately so the banner
+    // doesn't lag a stale state until the next unrelated refetch.
+    if (typeof w.getModValidation === 'function') {
+      const v = w.getModValidation(recompName);
+      setValidation(v && Array.isArray(v.issues) ? v : { ok: true, issues: [] });
+    }
   }, [recompName]);
 
   const toggleEnabled = useCallback((id: string) => {
@@ -175,21 +242,68 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
     );
   }
 
+  const errors = validation?.issues.filter(i => i.kind === 'error') ?? [];
+  const warnings = validation?.issues.filter(i => i.kind === 'warning') ?? [];
+  const erroredIds = new Set(errors.map(i => i.id));
+  const hasOrderIssue = (validation?.issues ?? []).some(i => i.message.includes('must load before') || i.message.includes('currently loads first'));
+  const hasEnabledCodeMod = mods.some(m => m.enabled && m.is_code);
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-          Drag to reorder load priority (top = highest).
+          Top means highest priority
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" onClick={handleOpenFolder} title="Open mods folder">
             <FolderOpen className="w-4 h-4" />
+          </Button>
+          <Button size="sm" variant="ghost" onClick={handleAutoSort} disabled={sorting || !hasOrderIssue} title="Reorder mods to satisfy their requires/load_after hints">
+            <ArrowDownUp className="w-3 h-3 mr-1" /> Auto-sort
           </Button>
           <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleBrowse} disabled={installing}>
             <Upload className="w-3 h-3 mr-1" /> Browse...
           </Button>
         </div>
       </div>
+
+      {hasEnabledCodeMod && (
+        <div className="flex items-center gap-2 p-3 rounded-lg text-xs border" style={{ backgroundColor: 'rgba(251,146,60,0.1)', borderColor: 'rgba(251,146,60,0.4)', color: '#fdba74' }}>
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <span>Mods are user-submitted and can run arbitrary code on your computer. Only install mods from people you trust.</span>
+        </div>
+      )}
+
+      {errors.length > 0 && (
+        <div className="p-3 rounded-lg text-xs space-y-2 border" style={{ backgroundColor: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.4)' }}>
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold text-red-300">This layout won't launch until fixed:</p>
+            {hasOrderIssue && (
+              <button
+                type="button"
+                onClick={handleAutoSort}
+                disabled={sorting}
+                className="shrink-0 px-2.5 py-1 rounded text-xs font-bold bg-yellow-500 text-black hover:bg-yellow-400 transition-colors disabled:opacity-50"
+              >
+                Fix
+              </button>
+            )}
+          </div>
+          {errors.map((issue, i) => (
+            <p key={i} className="text-red-300">• {issue.message}</p>
+          ))}
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="p-3 rounded-lg text-xs space-y-1 border" style={{ backgroundColor: 'rgba(250,204,21,0.08)', borderColor: 'rgba(250,204,21,0.35)' }}>
+          {warnings.map((issue, i) => (
+            <p key={i} className="text-yellow-400 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> {issue.message}
+            </p>
+          ))}
+        </div>
+      )}
 
       {installing && (
         <div className="flex items-center gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-selected)' }}>
@@ -216,6 +330,7 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
         <div ref={listRef} className="space-y-2">
           {mods.map(mod => {
             const isDragging = dragId === mod.id;
+            const rowHasError = mod.enabled && erroredIds.has(mod.id);
             return (
               <div
                 key={mod.id}
@@ -224,8 +339,16 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
                 style={{
                   backgroundColor: 'var(--theme-item-default)',
                   opacity: mod.enabled ? (isDragging ? 0.6 : 1) : 0.5,
+                  borderLeft: rowHasError ? '3px solid #f87171' : '3px solid transparent',
                 }}
               >
+                <Switch
+                  checked={mod.enabled}
+                  onCheckedChange={() => toggleEnabled(mod.id)}
+                  className="shrink-0"
+                  aria-label={mod.enabled ? `Disable ${mod.name}` : `Enable ${mod.name}`}
+                />
+
                 <span
                   className="shrink-0 cursor-grab active:cursor-grabbing touch-none"
                   style={{ color: 'var(--theme-text-muted)' }}
@@ -261,25 +384,25 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
                     </p>
                   )}
                   {mod.requires.length > 0 && (
-                    <p className="text-xs flex items-center gap-1 mt-0.5 text-yellow-400">
-                      <AlertTriangle className="w-3 h-3 shrink-0" /> Requires: {mod.requires.join(', ')}
+                    <p
+                      className="text-xs flex items-center gap-1 mt-0.5"
+                      style={{ color: rowHasError ? '#f87171' : 'var(--theme-text-muted)' }}
+                    >
+                      {rowHasError && <AlertTriangle className="w-3 h-3 shrink-0" />} Requires: {mod.requires.join(', ')}
+                    </p>
+                  )}
+                  {mod.conflicts.length > 0 && (
+                    <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+                      Conflicts: {mod.conflicts.join(', ')}
                     </p>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: 'var(--theme-text-muted)' }}>
-                    <input
-                      type="checkbox"
-                      checked={mod.enabled}
-                      onChange={() => toggleEnabled(mod.id)}
-                    />
-                    Enabled
-                  </label>
-                  <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => setConfirmRemove(mod)}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
+                <PlatformBadges mod={mod} />
+
+                <Button size="sm" className="shrink-0 bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => setConfirmRemove(mod)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
               </div>
             );
           })}
