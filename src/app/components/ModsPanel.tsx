@@ -22,6 +22,8 @@ interface ModInfo {
   enabled: boolean;
   /** `data:image/png;base64,...`, or empty when the mod has no icon.png. */
   icon: string;
+  /** Minimum host/game version this mod requires (e.g. `"1.2.0"`), or empty if the manifest declares no `game_version`. */
+  game_version: string;
 }
 
 interface InstallResult {
@@ -76,8 +78,9 @@ interface ModsPanelProps {
  * handled globally by FileDropManager, which dispatches `goopie:modschanged`
  * on completion — this panel listens for that to stay in sync.
  *
- * `requires`/`conflicts`/`load_after`/platform-availability are validated on
- * the Rust side (`getModValidation`) against the *enabled* mod set; the same
+ * `requires`/`conflicts`/`load_after`/platform-availability/`game_version`
+ * are validated on the Rust side (`getModValidation`) against the *enabled*
+ * mod set (and, for `game_version`, the installed game version); the same
  * validation gates Play itself (see `getLaunchError`), so a banner here is
  * purely proactive — reorder/enable still apply instantly either way.
  */
@@ -394,6 +397,14 @@ export function ModsPanel({ recompName }: ModsPanelProps) {
                   {mod.conflicts.length > 0 && (
                     <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
                       Conflicts: {mod.conflicts.join(', ')}
+                    </p>
+                  )}
+                  {mod.game_version && (
+                    <p
+                      className="text-xs flex items-center gap-1 mt-0.5"
+                      style={{ color: rowHasError ? '#f87171' : 'var(--theme-text-muted)' }}
+                    >
+                      {rowHasError && <AlertTriangle className="w-3 h-3 shrink-0" />} Requires game v{mod.game_version}
                     </p>
                   )}
                 </div>
