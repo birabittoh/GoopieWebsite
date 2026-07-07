@@ -12,6 +12,7 @@ import { openExternal } from '../utils/externalLink';
 const RELEASE_BASE = 'https://github.com/birabittoh/GoopieLauncher/releases/latest/download';
 const WINDOWS_MSI_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.msi`;
 const WINDOWS_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.exe`;
+const WINDOWS_SETUP_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64-setup.exe`;
 const LINUX_APPIMAGE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64.AppImage`;
 const LINUX_PORTABLE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64`;
 
@@ -24,6 +25,19 @@ function DownloadButton({ url, label }: { url: string; label: string }) {
         background: `linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))`,
         color: 'var(--theme-text-primary)',
       }}
+    >
+      <Download className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+function DownloadLink({ url, label }: { url: string; label: string }) {
+  return (
+    <button
+      onClick={() => openExternal(url)}
+      className="flex items-center gap-2 text-sm hover:underline"
+      style={{ color: 'var(--theme-text-secondary)' }}
     >
       <Download className="w-4 h-4" />
       {label}
@@ -79,11 +93,10 @@ export function Downloads() {
                 className="text-xl md:text-2xl font-bold"
                 style={{ color: 'var(--theme-text-primary)' }}
               >
-                Windows x64
+                Windows
               </h2>
               <div className="flex flex-wrap gap-3">
-                <DownloadButton url={WINDOWS_MSI_URL} label="Setup (.msi)" />
-                <DownloadButton url={WINDOWS_EXE_URL} label="Portable (.exe)" />
+                <DownloadButton url={WINDOWS_MSI_URL} label="Setup" />
               </div>
             </div>
           </div>
@@ -101,18 +114,17 @@ export function Downloads() {
                 className="text-xl md:text-2xl font-bold"
                 style={{ color: 'var(--theme-text-primary)' }}
               >
-                Linux x86_64
+                Linux
               </h2>
               <div className="flex flex-wrap gap-3">
                 <DownloadButton url={LINUX_APPIMAGE_URL} label="AppImage" />
-                <DownloadButton url={LINUX_PORTABLE_URL} label="Portable" />
               </div>
             </div>
           </div>
 
           {/* macOS */}
           <div
-            className="rounded-xl p-6 md:p-8 border"
+            className="rounded-xl p-6 md:p-8 mb-6 border"
             style={{
               backgroundColor: 'var(--theme-card-bg)',
               borderColor: 'var(--theme-border)',
@@ -131,6 +143,21 @@ export function Downloads() {
               >
                 Coming soon.
               </p>
+            </div>
+          </div>
+
+          {/* Other */}
+          <div>
+            <h2
+              className="text-xl md:text-2xl font-bold mb-3"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
+              Other
+            </h2>
+            <div className="flex flex-col gap-2">
+              <DownloadLink url={LINUX_PORTABLE_URL} label="Linux Portable" />
+              <DownloadLink url={WINDOWS_EXE_URL} label="Windows Portable" />
+              <DownloadLink url={WINDOWS_SETUP_EXE_URL} label="Windows Setup (alternative)" />
             </div>
           </div>
         </div>
