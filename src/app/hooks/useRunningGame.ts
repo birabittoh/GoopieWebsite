@@ -6,6 +6,8 @@ import { shouldMountUpdate } from '../utils/updateRequired';
 interface UseRunningGameOptions {
   selectedGame: Game | undefined;
   buildCvarArgs: () => string;
+  /** Tag -> declared CVarType, mirroring buildCvarArgs's emitted tags. */
+  buildCvarTypes: () => Record<string, string>;
   setAudioMuted: (value: boolean) => void;
   /**
    * Called instead of launching when the selected game's enabled mods fail
@@ -19,6 +21,7 @@ interface UseRunningGameOptions {
 export function useRunningGame({
   selectedGame,
   buildCvarArgs,
+  buildCvarTypes,
   setAudioMuted,
   onModsInvalid,
 }: UseRunningGameOptions) {
@@ -73,6 +76,19 @@ export function useRunningGame({
     return cvarArgs;
   }, [selectedGame, buildCvarArgs]);
 
+  /**
+   * Mirrors composeCvarArgs's tag set with each tag's declared type, so the
+   * launcher can write correctly-typed values (quoted strings vs. bare
+   * bool/int/float) into the game's TOML config instead of guessing.
+   */
+  const composeCvarTypes = useCallback((): Record<string, string> => {
+    if (!selectedGame) return {};
+    const types = buildCvarTypes();
+    if (selectedGame.isXBLA) types.license_mask = 'Int';
+    if (selectedGame.useXenosRenderer) types.gpu_plugin = 'Enum';
+    return types;
+  }, [selectedGame, buildCvarTypes]);
+
   const playBuild = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;
     const w = window as any;
@@ -81,8 +97,9 @@ export function useRunningGame({
     setLaunchError(null);
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
     const cvarArgs = composeCvarArgs();
-    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name));
-  }, [selectedGame, composeCvarArgs, setAudioMuted]);
+    const cvarTypes = composeCvarTypes();
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name), JSON.stringify(cvarTypes));
+  }, [selectedGame, composeCvarArgs, composeCvarTypes, setAudioMuted]);
 
   const requestPlay = useCallback((build: InstalledBuild) => {
     if (!selectedGame) return;

@@ -91,5 +91,21 @@ export function useCvarSettings(gameId: string | undefined, cvars: CVar[] | unde
     return parts.join(' ');
   }, [list, values]);
 
-  return { values, getValue, setValue, reset, buildArgs };
+  /**
+   * Maps each emitted cvar's tag to its declared `CVarType`, so the launcher
+   * can write it into the game's TOML config with the correct TOML type
+   * (quoted string vs. bare bool/int/float) instead of guessing from the
+   * formatted value string alone. Keys mirror `buildArgs` exactly.
+   */
+  const buildTypes = useCallback((): Record<string, string> => {
+    const types: Record<string, string> = {};
+    for (const cvar of list) {
+      const tag = (cvar.tag || '').trim();
+      if (!tag) continue;
+      types[tag] = cvar.type;
+    }
+    return types;
+  }, [list]);
+
+  return { values, getValue, setValue, reset, buildArgs, buildTypes };
 }

@@ -177,7 +177,7 @@ export function Library() {
     }
   }, [selectedGame?.recompName]);
 
-  const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs } =
+  const { getValue: getCvarValue, setValue: setCvarValue, reset: resetCvar, buildArgs: buildCvarArgs, buildTypes: buildCvarTypes } =
     useCvarSettings(selectedGame?.id, selectedGame?.cvars);
 
   const releasesState = useGameReleases(selectedGame);
@@ -223,6 +223,7 @@ export function Library() {
   const runningGameHook = useRunningGame({
     selectedGame,
     buildCvarArgs,
+    buildCvarTypes,
     setAudioMuted,
     // The Play button is never disabled for a broken mod layout — instead,
     // routing straight to the Mods tab (with its "Fix" auto-sort action) is
