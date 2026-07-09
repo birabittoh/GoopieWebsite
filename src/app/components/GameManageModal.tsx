@@ -12,7 +12,6 @@ import {
 import type { Game } from '../types/game';
 import { SaveManagerPanel } from './SaveManagerPanel';
 import { AchievementsPanel } from './AchievementsPanel';
-import { ModsPanel } from './ModsPanel';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface InstalledDlc {
@@ -30,11 +29,9 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
-  /** Opens directly on this tab (e.g. routing here from a failed launch due to an invalid mod layout), overriding `lastManageTab` for this one open. */
-  initialTab?: 'assets' | 'saves' | 'achievements' | 'mods';
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, initialTab }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
   const [desktopShortcutCreated, setDesktopShortcutCreated] = useState(false);
@@ -53,16 +50,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, init
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
     typeof (window as any).getAchievements === 'function';
-  // 1.6.1, not 1.6.0: 1.6.0 shipped the Mods tab without dependency/conflict/
-  // platform validation (getModValidation/autoSortMods, and the extra
-  // conflicts/load_after/platform/is_code fields on ModInfo) — rather than
-  // have ModsPanel handle both shapes, gate the whole tab on the version that
-  // has all of it, so ModsPanel can assume those are always present.
-  const showModsTab =
-    isLauncherVersionAtLeast('1.6.1') &&
-    !!game.modsEnabled &&
-    typeof (window as any).getMods === 'function';
-  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showModsTab].filter(Boolean).length;
+  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab].filter(Boolean).length;
   const useTabs = visiblePanelCount > 1;
 
   const refresh = useCallback(() => {
@@ -309,14 +297,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, init
             <Tabs
               className="min-w-0"
               defaultValue={
-                initialTab === 'mods' && showModsTab
-                  ? 'mods'
-                  : (lastManageTab === 'assets' && showAssetsTab) ||
-                    (lastManageTab === 'saves' && showSavesTab) ||
-                    (lastManageTab === 'achievements' && showAchievementsTab) ||
-                    (lastManageTab === 'mods' && showModsTab)
-                    ? lastManageTab
-                    : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'mods'
+                (lastManageTab === 'assets' && showAssetsTab) ||
+                (lastManageTab === 'saves' && showSavesTab) ||
+                (lastManageTab === 'achievements' && showAchievementsTab)
+                  ? lastManageTab
+                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : 'achievements'
               }
               onValueChange={v => { lastManageTab = v; }}
             >
@@ -330,9 +315,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, init
                 {showAchievementsTab && (
                   <TabsTrigger value="achievements" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Achievements</TabsTrigger>
                 )}
-                {showModsTab && (
-                  <TabsTrigger value="mods" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Mods</TabsTrigger>
-                )}
               </TabsList>
               {showAssetsTab && <TabsContent value="assets">{assetsPanel}</TabsContent>}
               {showSavesTab && (
@@ -345,11 +327,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, init
                   <AchievementsPanel recompName={game.recompName} />
                 </TabsContent>
               )}
-              {showModsTab && (
-                <TabsContent value="mods">
-                  <ModsPanel recompName={game.recompName} />
-                </TabsContent>
-              )}
             </Tabs>
           ) : showAssetsTab ? (
             assetsPanel
@@ -357,8 +334,6 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, init
             <SaveManagerPanel recompName={game.recompName} />
           ) : showAchievementsTab ? (
             <AchievementsPanel recompName={game.recompName} />
-          ) : showModsTab ? (
-            <ModsPanel recompName={game.recompName} />
           ) : null}
         </DialogContent>
       </Dialog>

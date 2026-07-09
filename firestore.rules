@@ -132,5 +132,26 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Mod catalog entries — moderated per-game mod submissions surfaced on
+    // the per-game Mods page. Any signed-in user can read the list and submit
+    // a new mod (which always lands as 'unapproved'); only an admin or a
+    // developer assigned to the mod's game can change its status
+    // (approve/reject/feature/require) or its resolved release/asset fields.
+    match /mods/{modId} {
+      allow read: if true;
+
+      // Any signed-in user can submit a mod, but only ever as 'unapproved',
+      // stamped as themselves.
+      allow create: if request.auth != null
+        && request.resource.data.status == 'unapproved'
+        && request.resource.data.submittedBy == request.auth.uid
+        && request.resource.data.gameId is string;
+
+      // Status transitions / re-resolving the release+asset are privileged;
+      // an admin or the game's assigned developer can update or delete
+      // (reject) a mod doc.
+      allow update, delete: if isAdmin() || isDeveloperFor(resource.data.gameId);
+    }
+
   }
 }

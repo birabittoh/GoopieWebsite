@@ -20,6 +20,7 @@ const VehicleBrowser = lazy(() => import('./pages/VehicleBrowser').then(m => ({ 
 const NotFound = lazy(() => import('./pages/NotFound').then(m => ({ default: m.NotFound })));
 const MarkdownReference = lazy(() => import('./pages/MarkdownReference').then(m => ({ default: m.MarkdownReference })));
 const GameEditorPage = lazy(() => import('./pages/GameEditorPage').then(m => ({ default: m.GameEditorPage })));
+const GameMods = lazy(() => import('./pages/GameMods').then(m => ({ default: m.GameMods })));
 
 function isInCEF(): boolean {
   return typeof (window as any)?.GetPlatform === 'function';
@@ -108,6 +109,10 @@ export const router = createHashRouter([
   {
     path: '/:recompName/vehicles',
     Component: withSuspense(VehicleBrowser),
+  },
+  {
+    path: '/:recompName/mods',
+    Component: withSuspense(GameMods),
   },
   {
     path: '/markdown-reference',

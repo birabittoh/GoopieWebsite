@@ -34,6 +34,8 @@ import { ConfirmCloseGameDialog } from '../components/ConfirmCloseGameDialog';
 import { ConfirmRemoveBuildDialog } from '../components/ConfirmRemoveBuildDialog';
 import { ExtractErrorDialog } from '../components/ExtractErrorDialog';
 import { GameManageModal } from '../components/GameManageModal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Progress } from '../components/ui/progress';
 
 export function Library() {
   const { recompName: urlRecompName } = useParams<{ recompName: string }>();
@@ -69,10 +71,6 @@ export function Library() {
   const [editingDescription, setEditingDescription] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [showManageModal, setShowManageModal] = useState(false);
-  // Set right before opening the Manage modal from a blocked Play attempt
-  // (see useRunningGame's onModsInvalid below), so it lands on the Mods tab
-  // instead of whatever tab was last open.
-  const [manageModalInitialTab, setManageModalInitialTab] = useState<'mods' | undefined>(undefined);
   const [pendingRemoveBuild, setPendingRemoveBuild] = useState<{ name: string; version?: string; asset?: string } | null>(null);
   const appliedUrlRef = useMemo(() => ({ current: undefined as string | undefined }), []);
 
@@ -226,11 +224,10 @@ export function Library() {
     buildCvarTypes,
     setAudioMuted,
     // The Play button is never disabled for a broken mod layout — instead,
-    // routing straight to the Mods tab (with its "Fix" auto-sort action) is
-    // far more actionable than a plain error banner would be.
+    // routing straight to the dedicated Mods page (with its "Fix" auto-sort
+    // action) is far more actionable than a plain error banner would be.
     onModsInvalid: () => {
-      setManageModalInitialTab('mods');
-      setShowManageModal(true);
+      if (selectedGame) navigate(`/${selectedGame.recompName}/mods`);
     },
   });
 
@@ -547,6 +544,7 @@ export function Library() {
     onRemoveAssets: removeAssets,
     onSwitchToInstalledBuild: switchToInstalledBuild,
     onOpenManage: isLauncherVersionAtLeast('1.4.0') || !selectedGame.disableSaveManager ? () => setShowManageModal(true) : undefined,
+    onOpenMods: () => navigate(`/${selectedGame.recompName}/mods`),
     updateInstalled: installation.updateInstalled,
     dlcInstalled: installation.dlcInstalled,
     versionPicker: versionPickerProps,
@@ -739,14 +737,29 @@ export function Library() {
         onClose={installation.clearExtractError}
       />
 
+      <Dialog open={!!runningGameHook.requiredModsDownload}>
+        <DialogContent
+          className="sm:max-w-sm"
+          showCloseButton={false}
+          style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Downloading required mods...</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+            {runningGameHook.requiredModsDownload?.modName}
+          </p>
+          <Progress value={runningGameHook.requiredModsDownload?.progress ?? 0} className="h-2" />
+        </DialogContent>
+      </Dialog>
+
       {selectedGame && showManageModal && (
         <GameManageModal
           game={selectedGame}
           open={showManageModal}
-          onClose={() => { setShowManageModal(false); setManageModalInitialTab(undefined); }}
+          onClose={() => setShowManageModal(false)}
           canEdit={canEditGame(selectedGame.id)}
           onSaveGame={saveGame}
-          initialTab={manageModalInitialTab}
         />
       )}
     </div>

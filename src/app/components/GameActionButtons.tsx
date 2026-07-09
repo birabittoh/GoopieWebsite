@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, RotateCcw } from 'lucide-react';
+import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, RotateCcw, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -8,6 +8,7 @@ import { InstalledBuildsList } from './InstalledBuildsList';
 import type { Game } from '../types/game';
 import type { InstalledBuild, GameRelease, ReleaseAsset } from '../data/useGameReleases';
 import { updateRequiredForBuild } from '../utils/updateRequired';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 /** Strip the game's recompName prefix off an asset/build filename so it reads
  *  as a short, human-friendly descriptor (e.g. "windows-x64-release.exe"). */
@@ -59,6 +60,7 @@ export interface GameActionButtonsProps {
   onRemoveAssets: (force?: boolean) => void;
   onSwitchToInstalledBuild: (build: InstalledBuild) => void;
   onOpenManage?: () => void;
+  onOpenMods?: () => void;
   updateInstalled?: boolean;
   dlcInstalled?: boolean;
 
@@ -116,10 +118,20 @@ export function GameActionButtons({
   onRemoveAssets,
   onSwitchToInstalledBuild,
   onOpenManage,
+  onOpenMods,
   updateInstalled,
   dlcInstalled,
   versionPicker,
 }: GameActionButtonsProps) {
+  // Visible only once a build is actually selected *and* installed (present in
+  // installedBuilds) — before that there's nothing to browse mods against yet.
+  const showModsButton =
+    !!onOpenMods &&
+    isLauncherVersionAtLeast('1.7.0') &&
+    !!game.modsEnabled &&
+    isoInstalled &&
+    !!selectedBuild &&
+    installedBuilds.some(b => b.name === selectedBuild.name);
   const [showTuDialog, setShowTuDialog] = useState(false);
 
   // Only relevant when the TU is optional — if it's required, no build (installed
@@ -264,6 +276,15 @@ export function GameActionButtons({
                 onClick={onOpenManage}
               >
                 <Settings2 className={`${iconSize} ${iconMr}`} /> Manage
+              </Button>
+            )}
+            {showModsButton && (
+              <Button
+                className={`text-white ${btnPxSm}`}
+                style={{ backgroundColor: 'var(--theme-accent)' }}
+                onClick={onOpenMods}
+              >
+                <Package className={`${iconSize} ${iconMr}`} /> Mods
               </Button>
             )}
           </div>
