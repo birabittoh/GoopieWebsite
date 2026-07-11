@@ -15,6 +15,8 @@ const WINDOWS_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64.exe`;
 const WINDOWS_SETUP_EXE_URL = `${RELEASE_BASE}/Goopie-Launcher-windows-x86_64-setup.exe`;
 const LINUX_APPIMAGE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64.AppImage`;
 const LINUX_PORTABLE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-x86_64`;
+const LINUX_ARM64_APPIMAGE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-aarch64.AppImage`;
+const LINUX_ARM64_PORTABLE_URL = `${RELEASE_BASE}/Goopie-Launcher-linux-aarch64`;
 
 function DownloadButton({ url, label }: { url: string; label: string }) {
   return (
@@ -118,6 +120,7 @@ export function Downloads() {
               </h2>
               <div className="flex flex-wrap gap-3">
                 <DownloadButton url={LINUX_APPIMAGE_URL} label="AppImage" />
+                <DownloadButton url={LINUX_ARM64_APPIMAGE_URL} label="AppImage (arm64)" />
               </div>
             </div>
           </div>
@@ -155,7 +158,9 @@ export function Downloads() {
               Other
             </h2>
             <div className="flex flex-col gap-2">
+              <DownloadLink url={LINUX_ARM64_PORTABLE_URL} label="Linux AppImage (arm64)" />
               <DownloadLink url={LINUX_PORTABLE_URL} label="Linux Portable" />
+              <DownloadLink url={LINUX_ARM64_PORTABLE_URL} label="Linux Portable (arm64)" />
               <DownloadLink url={WINDOWS_EXE_URL} label="Windows Portable" />
               <DownloadLink url={WINDOWS_SETUP_EXE_URL} label="Windows Setup (alternative)" />
             </div>
