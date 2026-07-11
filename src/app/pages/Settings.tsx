@@ -51,6 +51,8 @@ export function Settings() {
   const [showFps, setShowFps] = useState<boolean>(() => getFpsEnabled());
   const [offline, setOffline] = useState<boolean | null>(null);
   const [discordPresence, setDiscordPresence] = useState<boolean | null>(null);
+  const [collapseToTray, setCollapseToTray] = useState<boolean | null>(null);
+  const [collapseAfterPlay, setCollapseAfterPlay] = useState<boolean | null>(null);
   const [reachable, setReachable] = useState(true);
   const launcherVersion = getLauncherVersion();
   const w = window as any;
@@ -95,6 +97,12 @@ export function Settings() {
     }
     if (typeof w.getDiscordPresenceEnabled === 'function') {
       setDiscordPresence(Boolean(w.getDiscordPresenceEnabled()));
+    }
+    if (typeof w.getCollapseToTray === 'function') {
+      setCollapseToTray(Boolean(w.getCollapseToTray()));
+    }
+    if (typeof w.getCollapseAfterPlay === 'function') {
+      setCollapseAfterPlay(Boolean(w.getCollapseAfterPlay()));
     }
     if (isLinuxLauncher) {
       if (typeof w.getProtonInstallations === 'function') {
@@ -429,6 +437,98 @@ export function Settings() {
                   style={{ transform: discordPresence ? 'translateX(22px)' : 'translateX(3px)' }}
                 />
               </button>
+            </div>
+          </section>
+        )}
+
+        {/* Tray/taskbar collapse section — only meaningful inside a Tauri
+            launcher new enough to expose the getCollapseToTray bridge
+            command (feature-detected on top of the version gate). */}
+        {isInTauriLauncher() && isLauncherVersionAtLeast('1.7.0') && typeof w.getCollapseToTray === 'function' && collapseToTray !== null && (
+          <section>
+            <h2 className="text-lg font-semibold mb-1" style={{ color: 'var(--theme-text-primary)' }}>Taskbar</h2>
+            <p className="text-sm mb-5" style={{ color: 'var(--theme-text-muted)' }}>
+              Keep the launcher out of the way to reduce background resource usage.
+            </p>
+
+            <div className="flex flex-col gap-4">
+              <div
+                className="rounded-xl border-2 p-5 flex items-center justify-between gap-4"
+                style={{
+                  borderColor: 'var(--theme-border)',
+                  backgroundColor: 'var(--theme-card-bg)',
+                  backdropFilter: 'var(--theme-backdrop-blur)',
+                  WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+                }}
+              >
+                <div className="min-w-0">
+                  <div className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                    Collapse to tray instead of quitting
+                  </div>
+                  <div className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                    Closing the launcher window minimizes it to an icon in the taskbar instead of exiting.
+                  </div>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={collapseToTray}
+                  onClick={() => {
+                    const next = !collapseToTray;
+                    setCollapseToTray(next);
+                    w.setCollapseToTray(next);
+                  }}
+                  className="shrink-0 relative inline-flex items-center h-7 w-12 rounded-full transition-colors"
+                  style={{
+                    backgroundColor: collapseToTray ? 'var(--theme-accent)' : 'var(--theme-item-default)',
+                    border: '1px solid var(--theme-border)',
+                  }}
+                >
+                  <span
+                    className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
+                    style={{ transform: collapseToTray ? 'translateX(22px)' : 'translateX(3px)' }}
+                  />
+                </button>
+              </div>
+
+              {collapseToTray && typeof w.getCollapseAfterPlay === 'function' && collapseAfterPlay !== null && (
+                <div
+                  className="rounded-xl border-2 p-5 flex items-center justify-between gap-4"
+                  style={{
+                    borderColor: 'var(--theme-border)',
+                    backgroundColor: 'var(--theme-card-bg)',
+                    backdropFilter: 'var(--theme-backdrop-blur)',
+                    WebkitBackdropFilter: 'var(--theme-backdrop-blur)',
+                  }}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
+                      Collapse to tray after launching a game
+                    </div>
+                    <div className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                      Automatically minimizes the launcher to the taskbar when you hit Play.
+                    </div>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={collapseAfterPlay}
+                    onClick={() => {
+                      const next = !collapseAfterPlay;
+                      setCollapseAfterPlay(next);
+                      w.setCollapseAfterPlay(next);
+                    }}
+                    className="shrink-0 relative inline-flex items-center h-7 w-12 rounded-full transition-colors"
+                    style={{
+                      backgroundColor: collapseAfterPlay ? 'var(--theme-accent)' : 'var(--theme-item-default)',
+                      border: '1px solid var(--theme-border)',
+                    }}
+                  >
+                    <span
+                      className="inline-block w-5 h-5 rounded-full bg-white transition-transform"
+                      style={{ transform: collapseAfterPlay ? 'translateX(22px)' : 'translateX(3px)' }}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         )}
