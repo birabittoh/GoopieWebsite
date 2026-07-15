@@ -675,10 +675,6 @@ export function Library() {
                   {/* Sidebar */}
                   <GameInfoSidebar
                     game={selectedGame}
-                    isInCEF={isInCEF}
-                    getCvarValue={getCvarValue}
-                    setCvarValue={setCvarValue}
-                    resetCvar={resetCvar}
                     playtime={getPlaytime(selectedGame.recompName)}
                   />
                 </div>
@@ -760,6 +756,10 @@ export function Library() {
           onClose={() => setShowManageModal(false)}
           canEdit={canEditGame(selectedGame.id)}
           onSaveGame={saveGame}
+          isInCEF={isInCEF}
+          getCvarValue={getCvarValue}
+          setCvarValue={setCvarValue}
+          resetCvar={resetCvar}
         />
       )}
     </div>

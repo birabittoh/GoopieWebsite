@@ -12,6 +12,7 @@ import {
 import type { Game } from '../types/game';
 import { SaveManagerPanel } from './SaveManagerPanel';
 import { AchievementsPanel } from './AchievementsPanel';
+import { CvarSettingsPanel } from './CvarSettingsPanel';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
 interface InstalledDlc {
@@ -29,9 +30,13 @@ interface GameManageModalProps {
   onClose: () => void;
   canEdit?: boolean;
   onSaveGame?: (game: Game) => void;
+  isInCEF: boolean;
+  getCvarValue: (cv: NonNullable<Game['cvars']>[number]) => any;
+  setCvarValue: (id: string, value: any) => void;
+  resetCvar: (id: string) => void;
 }
 
-export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: GameManageModalProps) {
+export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isInCEF, getCvarValue, setCvarValue, resetCvar }: GameManageModalProps) {
   const [updateInstalled, setUpdateInstalled] = useState(false);
   const [installedDlc, setInstalledDlc] = useState<InstalledDlc[]>([]);
   const [desktopShortcutCreated, setDesktopShortcutCreated] = useState(false);
@@ -50,7 +55,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
     typeof (window as any).getAchievements === 'function';
-  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab].filter(Boolean).length;
+  const showSettingsTab = !!game.cvars && game.cvars.length > 0;
+  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showSettingsTab].filter(Boolean).length;
   const useTabs = visiblePanelCount > 1;
 
   const refresh = useCallback(() => {
@@ -299,9 +305,10 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
               defaultValue={
                 (lastManageTab === 'assets' && showAssetsTab) ||
                 (lastManageTab === 'saves' && showSavesTab) ||
-                (lastManageTab === 'achievements' && showAchievementsTab)
+                (lastManageTab === 'achievements' && showAchievementsTab) ||
+                (lastManageTab === 'settings' && showSettingsTab)
                   ? lastManageTab
-                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : 'achievements'
+                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'settings'
               }
               onValueChange={v => { lastManageTab = v; }}
             >
@@ -315,6 +322,9 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
                 {showAchievementsTab && (
                   <TabsTrigger value="achievements" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Achievements</TabsTrigger>
                 )}
+                {showSettingsTab && (
+                  <TabsTrigger value="settings" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Settings</TabsTrigger>
+                )}
               </TabsList>
               {showAssetsTab && <TabsContent value="assets">{assetsPanel}</TabsContent>}
               {showSavesTab && (
@@ -327,6 +337,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
                   <AchievementsPanel recompName={game.recompName} />
                 </TabsContent>
               )}
+              {showSettingsTab && (
+                <TabsContent value="settings">
+                  <CvarSettingsPanel game={game} isInCEF={isInCEF} getCvarValue={getCvarValue} setCvarValue={setCvarValue} resetCvar={resetCvar} />
+                </TabsContent>
+              )}
             </Tabs>
           ) : showAssetsTab ? (
             assetsPanel
@@ -334,6 +349,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame }: Ga
             <SaveManagerPanel recompName={game.recompName} />
           ) : showAchievementsTab ? (
             <AchievementsPanel recompName={game.recompName} />
+          ) : showSettingsTab ? (
+            <CvarSettingsPanel game={game} isInCEF={isInCEF} getCvarValue={getCvarValue} setCvarValue={setCvarValue} resetCvar={resetCvar} />
           ) : null}
         </DialogContent>
       </Dialog>
