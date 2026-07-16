@@ -12,6 +12,7 @@ import {
 import type { Game } from '../types/game';
 import { SaveManagerPanel } from './SaveManagerPanel';
 import { AchievementsPanel } from './AchievementsPanel';
+import { LeaderboardsPanel } from './LeaderboardsPanel';
 import { CvarSettingsPanel } from './CvarSettingsPanel';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 
@@ -55,8 +56,15 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
     typeof (window as any).getAchievements === 'function';
+  const showLeaderboardsTab =
+    isLauncherVersionAtLeast('1.7.0') &&
+    typeof (window as any).listLeaderboardFiles === 'function' &&
+    (() => {
+      const files = (window as any).listLeaderboardFiles(game.recompName);
+      return Array.isArray(files) && files.length > 0;
+    })();
   const showSettingsTab = !!game.cvars && game.cvars.length > 0;
-  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showSettingsTab].filter(Boolean).length;
+  const visiblePanelCount = [showAssetsTab, showSavesTab, showAchievementsTab, showLeaderboardsTab, showSettingsTab].filter(Boolean).length;
   const useTabs = visiblePanelCount > 1;
 
   const refresh = useCallback(() => {
@@ -306,9 +314,10 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
                 (lastManageTab === 'assets' && showAssetsTab) ||
                 (lastManageTab === 'saves' && showSavesTab) ||
                 (lastManageTab === 'achievements' && showAchievementsTab) ||
+                (lastManageTab === 'leaderboards' && showLeaderboardsTab) ||
                 (lastManageTab === 'settings' && showSettingsTab)
                   ? lastManageTab
-                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : 'settings'
+                  : showAssetsTab ? 'assets' : showSavesTab ? 'saves' : showAchievementsTab ? 'achievements' : showLeaderboardsTab ? 'leaderboards' : 'settings'
               }
               onValueChange={v => { lastManageTab = v; }}
             >
@@ -321,6 +330,9 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
                 )}
                 {showAchievementsTab && (
                   <TabsTrigger value="achievements" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Achievements</TabsTrigger>
+                )}
+                {showLeaderboardsTab && (
+                  <TabsTrigger value="leaderboards" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Leaderboards</TabsTrigger>
                 )}
                 {showSettingsTab && (
                   <TabsTrigger value="settings" className="data-[state=active]:bg-[var(--theme-item-selected)] text-[var(--theme-text-muted)] data-[state=active]:text-[var(--theme-text-primary)]">Settings</TabsTrigger>
@@ -337,6 +349,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
                   <AchievementsPanel recompName={game.recompName} />
                 </TabsContent>
               )}
+              {showLeaderboardsTab && (
+                <TabsContent value="leaderboards">
+                  <LeaderboardsPanel recompName={game.recompName} />
+                </TabsContent>
+              )}
               {showSettingsTab && (
                 <TabsContent value="settings">
                   <CvarSettingsPanel game={game} isInCEF={isInCEF} getCvarValue={getCvarValue} setCvarValue={setCvarValue} resetCvar={resetCvar} />
@@ -349,6 +366,8 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
             <SaveManagerPanel recompName={game.recompName} />
           ) : showAchievementsTab ? (
             <AchievementsPanel recompName={game.recompName} />
+          ) : showLeaderboardsTab ? (
+            <LeaderboardsPanel recompName={game.recompName} />
           ) : showSettingsTab ? (
             <CvarSettingsPanel game={game} isInCEF={isInCEF} getCvarValue={getCvarValue} setCvarValue={setCvarValue} resetCvar={resetCvar} />
           ) : null}
