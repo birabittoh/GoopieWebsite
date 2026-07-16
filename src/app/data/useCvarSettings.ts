@@ -29,6 +29,7 @@ function coerce(cvar: CVar, raw: CVarValue | undefined): CVarValue {
     const s = String(raw);
     return opts.includes(s) ? s : cvar.defaultValue;
   }
+  if (cvar.type === 'String') return String(raw);
   const n = typeof raw === 'number' ? raw : Number(raw);
   if (!isFinite(n)) return cvar.defaultValue;
   return cvar.type === 'Int' ? Math.trunc(n) : n;
@@ -36,7 +37,7 @@ function coerce(cvar: CVar, raw: CVarValue | undefined): CVarValue {
 
 function formatArg(cvar: CVar, value: CVarValue): string {
   if (cvar.type === 'Bool') return Boolean(value) ? 'true' : 'false';
-  if (cvar.type === 'Enum') return String(value);
+  if (cvar.type === 'Enum' || cvar.type === 'String') return String(value);
   if (cvar.type === 'Int') return String(Math.trunc(Number(value)));
   // Float — keep finite numeric formatting (avoid trailing exponent).
   const n = Number(value);

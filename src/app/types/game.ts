@@ -187,7 +187,7 @@ export interface Game {
   modsEnabled?: boolean;
 }
 
-export type CVarType = 'Int' | 'Float' | 'Bool' | 'Enum';
+export type CVarType = 'Int' | 'Float' | 'Bool' | 'Enum' | 'String';
 
 export interface CVar {
   /** Stable id (uuid) so list edits don't collide on tag rename. */
@@ -200,7 +200,7 @@ export interface CVar {
   type: CVarType;
   /** Default value used when the player hasn't customized it. */
   defaultValue: number | boolean | string;
-  /** Allowed values for Enum-type cvars. */
+  /** Allowed values for Enum-type cvars. Unused for String cvars. */
   options?: string[];
   /** Optional description shown to the player. */
   description?: string;

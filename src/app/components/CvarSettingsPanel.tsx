@@ -65,6 +65,16 @@ export function CvarSettingsPanel({
                       {(cv.options ?? []).map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                ) : cv.type === 'String' ? (
+                  <input
+                    id={`cvar-${cv.id}`}
+                    type="text"
+                    value={String(value)}
+                    onChange={e => setCvarValue(cv.id, e.target.value)}
+                    disabled={!isInCEF}
+                    className="w-32 rounded-md px-2 py-1 text-sm border outline-none text-right disabled:cursor-not-allowed"
+                    style={{ backgroundColor: 'var(--theme-page-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+                  />
                 ) : (
                   <input
                     id={`cvar-${cv.id}`}

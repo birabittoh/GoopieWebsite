@@ -53,6 +53,8 @@ function CVarRow({ cv, i, updateCv, removeCv, readOnly }: RowProps) {
               if (t === 'Enum') {
                 setRawOptions('');
                 updateCv(i, { type: t, defaultValue: '', options: [] });
+              } else if (t === 'String') {
+                updateCv(i, { type: t, defaultValue: '', options: undefined });
               } else {
                 updateCv(i, { type: t, defaultValue: t === 'Bool' ? false : 0, options: undefined });
               }
@@ -65,6 +67,7 @@ function CVarRow({ cv, i, updateCv, removeCv, readOnly }: RowProps) {
               <SelectItem value="Float">Float</SelectItem>
               <SelectItem value="Bool">Bool</SelectItem>
               <SelectItem value="Enum">Enum</SelectItem>
+              <SelectItem value="String">String</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -89,6 +92,14 @@ function CVarRow({ cv, i, updateCv, removeCv, readOnly }: RowProps) {
                 {parsedOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
               </SelectContent>
             </Select>
+          ) : cv.type === 'String' ? (
+            <Input
+              value={typeof cv.defaultValue === 'string' ? cv.defaultValue : ''}
+              onChange={e => updateCv(i, { defaultValue: e.target.value })}
+              placeholder="value"
+              style={inputStyle}
+              disabled={readOnly}
+            />
           ) : (
             <Input
               type="number"
