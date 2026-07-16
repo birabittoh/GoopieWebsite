@@ -55,7 +55,11 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
   const showAchievementsTab =
     isLauncherVersionAtLeast('1.5.2') &&
     !!game.achievementsEnabled &&
-    typeof (window as any).getAchievements === 'function';
+    typeof (window as any).getAchievements === 'function' &&
+    (() => {
+      const achievements = (window as any).getAchievements(game.recompName);
+      return Array.isArray(achievements) && achievements.length > 0;
+    })();
   const showLeaderboardsTab =
     isLauncherVersionAtLeast('1.7.0') &&
     typeof (window as any).listLeaderboardFiles === 'function' &&

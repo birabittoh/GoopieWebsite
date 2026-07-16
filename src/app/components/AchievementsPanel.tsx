@@ -23,15 +23,34 @@ interface AchievementsPanelProps {
 const FLAG_SHOW_UNACHIEVED = 0x8;
 
 export function AchievementsPanel({ recompName }: AchievementsPanelProps) {
+  const [files, setFiles] = useState<string[] | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [achievements, setAchievements] = useState<Achievement[] | null>(null);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const w = window as any;
-    if (typeof w.getAchievements !== 'function') return;
-    const result = w.getAchievements(recompName);
-    setAchievements(Array.isArray(result) ? result : []);
+    if (typeof w.listAchievementFiles !== 'function') return;
+    const result = w.listAchievementFiles(recompName);
+    const list: string[] = Array.isArray(result) ? result : [];
+    setFiles(list);
+    setSelected(new Set(list));
   }, [recompName]);
+
+  useEffect(() => {
+    const w = window as any;
+    if (typeof w.getAchievements !== 'function' || files === null) return;
+    const result = w.getAchievements(recompName, Array.from(selected));
+    setAchievements(Array.isArray(result) ? result : []);
+  }, [recompName, files, selected]);
+
+  const toggleFile = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const toggleReveal = (id: number) => {
     setRevealed(prev => {
@@ -69,6 +88,29 @@ export function AchievementsPanel({ recompName }: AchievementsPanelProps) {
 
   return (
     <div className="space-y-3">
+      {files && files.length > 1 && (
+        <div className="flex flex-wrap gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          {files.map(id => {
+            const isSelected = selected.has(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleFile(id)}
+                className="text-xs font-medium px-2.5 py-1 rounded-full border transition-colors"
+                style={{
+                  backgroundColor: isSelected ? 'var(--theme-accent)' : 'var(--theme-item-selected)',
+                  borderColor: 'var(--theme-border)',
+                  color: isSelected ? '#fff' : 'var(--theme-text-muted)',
+                }}
+              >
+                {id}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Header / summary */}
       <div
         className="p-3 rounded-lg space-y-2"
