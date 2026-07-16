@@ -11,6 +11,8 @@ import {
 import { Progress } from './ui/progress';
 import { Button } from './ui/button';
 import { useLauncherUpdate } from '../data/LauncherUpdateContext';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
+import { openExternal } from '../utils/externalLink';
 
 interface LauncherUpdateDialogProps {
   open: boolean;
@@ -63,6 +65,19 @@ export function LauncherUpdateDialog({ open, onOpenChange }: LauncherUpdateDialo
                 A new launcher version{latestVersion ? ` (${latestVersion})` : ''} is available. Download and install it now? The launcher will restart automatically once the update is applied.
               </DialogDescription>
             </DialogHeader>
+            {!isLauncherVersionAtLeast('1.7.0') && (
+              <p className="text-sm rounded-md border p-3" style={{ borderColor: '#f59e0b', color: 'var(--theme-text-primary)', backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                Your launcher version is too old for the self-update process — it will probably fail. You can still try, but if it
+                doesn't work, download the latest version manually from{' '}
+                <a
+                  href="https://goopie.xyz/#/downloads"
+                  onClick={e => { e.preventDefault(); openExternal('https://goopie.xyz/#/downloads'); }}
+                  className="underline cursor-pointer"
+                >
+                  goopie.xyz/#/downloads
+                </a>.
+              </p>
+            )}
             <DialogFooter>
               <DialogClose asChild>
                 <Button
