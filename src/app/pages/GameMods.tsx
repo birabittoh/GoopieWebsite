@@ -575,6 +575,7 @@ export function GameMods() {
                       backgroundColor: isFocused ? 'var(--theme-item-selected)' : 'var(--theme-item-default)',
                       opacity: row.installed && !row.installed.enabled ? 0.5 : (isDragging ? 0.6 : 1),
                       border: isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
+                      borderLeft: status === 'featured' ? '3px solid #facc15' : undefined,
                     }}
                   >
                     {showDragHandles && row.installed && (
@@ -595,7 +596,7 @@ export function GameMods() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        {status && status !== 'approved' ? <StatusBadge status={status} /> : row.installed && <SideloadBadge />}
+                        {status && status !== 'approved' && status !== 'featured' ? <StatusBadge status={status} /> : !row.catalogMod && row.installed && <SideloadBadge />}
                         <p className="text-base font-semibold truncate" style={{ color: 'var(--theme-text-primary)' }}>
                           {name}{version && <span className="font-normal ml-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>v{version}</span>}
                         </p>
@@ -636,7 +637,7 @@ export function GameMods() {
                 onEdit={(cm) => setEditingMod(cm)}
                 onRequestUpdate={(cm) => setRequestingUpdateFor(cm)}
                 onCancelUpdate={(cm) => cancelModUpdate(cm.id)}
-                onAcceptUpdate={(cm) => acceptModUpdate(cm, computeChecksumIfAvailable(cm.pendingUpdate?.assetUrl))}
+                onAcceptUpdate={(cm, checksum) => acceptModUpdate(cm, checksum)}
                 onRejectUpdate={(cm) => rejectModUpdate(cm.id)}
                 onFocusMod={(key) => {
                   // A required/conflicting mod might be filtered out of view
@@ -752,7 +753,7 @@ interface ModDetailPanelProps {
   onEdit: (cm: CatalogMod) => void;
   onRequestUpdate: (cm: CatalogMod) => void;
   onCancelUpdate: (cm: CatalogMod) => void;
-  onAcceptUpdate: (cm: CatalogMod) => void;
+  onAcceptUpdate: (cm: CatalogMod, checksum: string) => void;
   onRejectUpdate: (cm: CatalogMod) => void;
   onFocusMod: (key: string) => void;
 }
@@ -760,6 +761,7 @@ interface ModDetailPanelProps {
 function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onAcceptUpdate, onRejectUpdate, onFocusMod }: ModDetailPanelProps) {
   const { catalogMod: cm, installed, isInstalled } = row;
   const [installingUrl, setInstallingUrl] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   const name = cm?.name ?? installed?.name ?? row.key;
   const version = cm?.version ?? installed?.version;
@@ -800,6 +802,32 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
       onFetchMods();
     }
   }, [cm, recompName, onFetchMods, installedMods, allCatalogMods]);
+
+  // Approving (or accepting an update to) a mod always publishes/changes its
+  // release asset, so a checksum for that exact asset must be computable
+  // before the write — `approveMod`/`acceptModUpdate` also enforce this, but
+  // checking here first lets us show a clear error instead of a thrown one.
+  const handleApprove = useCallback(() => {
+    if (!cm) return;
+    const checksum = computeChecksumIfAvailable(cm.assetUrl);
+    if (!checksum) {
+      setModerationError('Could not compute a checksum for this release (update your launcher, or check the asset URL). Approval requires one.');
+      return;
+    }
+    setModerationError(null);
+    approveMod(cm.id, '', checksum);
+  }, [cm]);
+
+  const handleAcceptUpdate = useCallback(() => {
+    if (!cm) return;
+    const checksum = computeChecksumIfAvailable(cm.pendingUpdate?.assetUrl);
+    if (!checksum) {
+      setModerationError('Could not compute a checksum for the requested release. Accepting an update requires one.');
+      return;
+    }
+    setModerationError(null);
+    onAcceptUpdate(cm, checksum);
+  }, [cm, onAcceptUpdate]);
 
   return (
     <div className="w-full space-y-4">
@@ -899,6 +927,8 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         </div>
       ) : null}
 
+      {moderationError && <p className="text-xs text-red-300">{moderationError}</p>}
+
       <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--theme-border)' }}>
         {!isInstalled && cm?.assetUrl && canInstallFromUrl && (
           <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstall} disabled={installingUrl}>
@@ -921,7 +951,7 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
 
         {privileged && cm && cm.pendingUpdate && (
           <>
-            <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={() => onAcceptUpdate(cm)}>
+            <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={handleAcceptUpdate}>
               <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Accept update (v{cm.pendingUpdate.version})
             </Button>
             <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onRejectUpdate(cm)}>
@@ -959,7 +989,7 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
             </Button>
             {cm.status === 'unapproved' && (
               <>
-                <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={() => approveMod(cm.id, '', computeChecksumIfAvailable(cm.assetUrl))}>
+                <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={handleApprove}>
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve
                 </Button>
                 <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onReject(cm)}>
@@ -1045,13 +1075,13 @@ function ReleaseFetchRow({ tag, onTagChange, assetRegex, onAssetRegexChange, onF
     <>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs" style={modLabelStyle}>Release tag (optional, defaults to latest)</label>
+          <label className="text-xs" style={modLabelStyle}>Release tag</label>
           <input value={tag} onChange={e => onTagChange(e.target.value)} className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
         </div>
         {onAssetRegexChange && (
           <div>
             <label className="text-xs" style={modLabelStyle}>Asset regex (optional)</label>
-            <input value={assetRegex} onChange={e => onAssetRegexChange(e.target.value)} placeholder="for multi-mod releases" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+            <input value={assetRegex} onChange={e => onAssetRegexChange(e.target.value)} placeholder="^mod_name" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
           </div>
         )}
       </div>
@@ -1131,6 +1161,7 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
       if (!asset) { setError('No matching asset (zip) found in that release.'); return; }
 
       setResolved({ repo, tag: release.tag, assetName: asset.name, assetUrl: asset.url });
+      setTag(release.tag);
 
       const fallbackName = repo.split('/')[1] || repo;
       let fetchedMeta: Partial<ModMetaState> = {};
@@ -1160,22 +1191,25 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
         }
       }
 
-      // Merge onto whatever's already in the form rather than overwriting it,
-      // so text the user typed before clicking Fetch (or a manual override
-      // after a first fetch) survives a (re-)fetch — only fields still blank
-      // get the fetched/derived value.
+      // Id/name/author/description/version/gameVersion are overwritten with
+      // whatever this fetch resolved — a "Re-fetch from GitHub" (after
+      // changing the repo/tag/regex) is an explicit re-sync, so it should
+      // reflect the newly-fetched release/asset, not silently keep stale
+      // values from a previous fetch. Fields the fetch didn't return
+      // anything for (or that aren't sourced from the fetch at all — icon,
+      // requires, screenshots, videos) still only fill in when blank.
       setMeta(prev => ({
-        name: prev.name || fetchedMeta.name || fallbackName,
-        author: prev.author || fetchedMeta.author || '',
-        description: prev.description || fetchedMeta.description || '',
-        version: prev.version || fetchedMeta.version || release.tag,
+        name: fetchedMeta.name || fallbackName,
+        author: fetchedMeta.author || prev.author,
+        description: fetchedMeta.description || prev.description,
+        version: fetchedMeta.version || release.tag,
         iconUrl: prev.iconUrl || fetchedMeta.iconUrl || '',
         requires: prev.requires.length ? prev.requires : (fetchedMeta.requires ?? []),
         screenshotsText: prev.screenshotsText,
         videosText: prev.videosText,
-        gameVersion: prev.gameVersion || fetchedMeta.gameVersion || '',
+        gameVersion: fetchedMeta.gameVersion || prev.gameVersion,
       }));
-      setModId(prev => prev || fetchedModId || sanitizeModId(fallbackName));
+      setModId(fetchedModId || sanitizeModId(fallbackName));
       setPlatform(prev => prev ?? nextPlatform);
     } finally {
       setBusy(false);
@@ -1350,6 +1384,21 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
 
   const handleSave = useCallback(async () => {
     setError(null);
+
+    // Only a re-fetch (via `handleFetch`) that resolved a *different* asset
+    // than the mod's current one needs a fresh checksum — a plain metadata
+    // edit (description, screenshots, etc.) with the release untouched
+    // shouldn't require re-resolving/re-hashing anything.
+    const assetChanged = !!resolved && resolved.assetUrl !== mod.assetUrl;
+    let checksum: string | undefined;
+    if (assetChanged) {
+      checksum = computeChecksumIfAvailable(resolved!.assetUrl);
+      if (!checksum) {
+        setError('Could not compute a checksum for the newly resolved release (update your launcher, or check the asset URL). Saving a changed release requires one.');
+        return;
+      }
+    }
+
     setBusy(true);
     try {
       const patch: ModMetadataPatch = {
@@ -1363,8 +1412,8 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
         videoUrls: parseUrlList(meta.videosText),
         gameVersion: meta.gameVersion.trim() || undefined,
         platform,
-        ...(resolved
-          ? { tag: resolved.tag, assetRegex: assetRegex.trim() || undefined, assetName: resolved.assetName, assetUrl: resolved.assetUrl }
+        ...(assetChanged
+          ? { tag: resolved!.tag, assetRegex: assetRegex.trim() || undefined, assetName: resolved!.assetName, assetUrl: resolved!.assetUrl, checksum }
           : {}),
       };
       await updateModMetadata(mod.id, patch);
@@ -1374,7 +1423,7 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
     } finally {
       setBusy(false);
     }
-  }, [mod.id, meta, platform, resolved, assetRegex, onClose]);
+  }, [mod.id, mod.assetUrl, meta, platform, resolved, assetRegex, onClose]);
 
   return (
     <ModDialog title={`Edit mod — ${mod.name}`} onClose={onClose}>
@@ -1460,19 +1509,20 @@ function RequestModUpdateModal({ mod, userUid, userName, onClose }: RequestModUp
       if (!asset) { setError('No matching asset (zip) found in that release.'); return; }
 
       setResolved({ repo: mod.githubRepo, tag: release.tag, assetName: asset.name, assetUrl: asset.url });
+      setTag(release.tag);
 
       if (canAutoFetchMetadata) {
         try {
           const fetched = (window as any).fetchModMetadata(asset.url);
           if (fetched) {
-            setVersion(prev => prev || fetched.version || release.tag);
-            setGameVersion(prev => prev || fetched.game_version || '');
+            setVersion(fetched.version || release.tag);
+            setGameVersion(fetched.game_version || '');
           }
         } catch {
           // Fall back to manual entry below.
         }
       } else {
-        setVersion(prev => prev || release.tag);
+        setVersion(release.tag);
       }
     } finally {
       setBusy(false);

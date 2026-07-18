@@ -44,8 +44,14 @@ export interface CatalogMod {
   // --- Where to fetch the mod's release asset from ---
   /** `"owner/repo"` on GitHub the mod's releases are published under. */
   githubRepo: string;
-  /** Specific release tag to pin to, or unset to always use the latest release. */
-  tag?: string;
+  /**
+   * Release tag this entry is pinned to. Always a concrete tag, never
+   * "latest" — the submit/edit/update-request forms may auto-fetch the
+   * latest release when the tag input is left blank, but the resolved
+   * tag is what gets stored, so every catalog entry (and its `checksum`)
+   * stays pinned to one specific, reproducible release forever.
+   */
+  tag: string;
   /** Regex matched against release asset filenames to pick the right one (for repos with multiple assets per release). */
   assetRegex?: string;
   /** Exact asset filename to use, as an alternative to `assetRegex`. */
@@ -55,14 +61,17 @@ export interface CatalogMod {
   /**
    * SHA-256 hex digest of `assetUrl`'s content, computed by the launcher (see
    * `computeModChecksum` in the bridge) at the moment an admin/developer
-   * approves this mod or accepts a `pendingUpdate` — never trust-on-first-use
-   * from the submitter, since a malicious submitter could just recompute
-   * their own checksum too. The launcher re-downloads and re-hashes the
-   * asset before installing and refuses to install on a mismatch, so a
-   * release asset swapped out after approval (e.g. a compromised GitHub
-   * repo) can't silently ship malware to players who already trust this
-   * catalog entry. Unset for mods approved before this field existed, or if
-   * the reviewer's launcher predates `computeModChecksum` support.
+   * approves this mod, accepts a `pendingUpdate`, or edits its release asset
+   * — never trust-on-first-use from the submitter, since a malicious
+   * submitter could just recompute their own checksum too. The launcher
+   * re-downloads and re-hashes the asset before installing and refuses to
+   * install on a mismatch, so a release asset swapped out after approval
+   * (e.g. a compromised GitHub repo) can't silently ship malware to players
+   * who already trust this catalog entry. Required (both by every
+   * write-path function below and by Firestore rules) on any write that
+   * changes `assetUrl`, so a mod can never end up published/updated with a
+   * stale or missing checksum. Only absent for `unapproved` mods that
+   * haven't been reviewed yet.
    */
   checksum?: string;
 
@@ -118,8 +127,8 @@ export interface CatalogMod {
 
 /** See [`CatalogMod.pendingUpdate`]. */
 export interface PendingModUpdate {
-  /** Specific release tag this request resolved to. */
-  tag?: string;
+  /** Specific release tag this request resolved to — see [`CatalogMod.tag`]. */
+  tag: string;
   assetName: string;
   assetUrl: string;
   version: string;
@@ -167,7 +176,7 @@ export interface SubmitModInput {
   gameId: string;
   recompName: string;
   githubRepo: string;
-  tag?: string;
+  tag: string;
   assetRegex?: string;
   assetName?: string;
   modId: string;
@@ -189,7 +198,7 @@ export interface SubmitModInput {
 export type ModMetadataPatch = Partial<
   Pick<
     CatalogMod,
-    'githubRepo' | 'tag' | 'assetRegex' | 'assetName' | 'assetUrl' |
+    'githubRepo' | 'tag' | 'assetRegex' | 'assetName' | 'assetUrl' | 'checksum' |
     'name' | 'author' | 'description' | 'version' | 'platform' | 'requires' | 'iconUrl' | 'screenshots' | 'videoUrls' | 'gameVersion'
   >
 >;
@@ -234,15 +243,23 @@ export async function submitMod(input: SubmitModInput): Promise<void> {
  * requires/platform/icon/screenshots/videos, and — if re-resolved — its
  * source repo/tag/regex/asset). Mirrors editing a game's details: gated to
  * admins/assigned developers by Firestore rules, not by this function.
+ *
+ * If `patch.assetUrl` is set (the caller re-resolved a new release), a
+ * non-empty `patch.checksum` computed from that same asset is required —
+ * Firestore rules enforce this too, but failing fast here gives the caller a
+ * clear error instead of a rejected write. See `CatalogMod.checksum`.
  */
 export async function updateModMetadata(id: string, patch: ModMetadataPatch): Promise<void> {
+  if (patch.assetUrl && !patch.checksum) {
+    throw new Error('Cannot update a mod\'s release asset without a checksum.');
+  }
   const cleaned = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
   await updateDoc(doc(db, MODS_COLLECTION, id), cleaned);
 }
 
 /** Fields a submitter resolves and proposes as their mod's next release. */
 export interface ModUpdateRequestInput {
-  tag?: string;
+  tag: string;
   assetName: string;
   assetUrl: string;
   version: string;
@@ -282,14 +299,18 @@ export async function cancelModUpdate(id: string): Promise<void> {
  * Applies `mod`'s pending update request onto its published release/version
  * fields and clears the request. Admin/developer only (enforced by
  * Firestore rules, which gate any write outside `pendingUpdate` to them).
- * `checksum`, if given (computed from `p.assetUrl` via the launcher's
- * `computeModChecksum` bridge call), replaces the mod's previous checksum —
+ * `checksum`, computed from `p.assetUrl` via the launcher's
+ * `computeModChecksum` bridge call, replaces the mod's previous checksum —
  * an accepted update ships a new asset, so the old checksum no longer
- * applies. See `CatalogMod.checksum`.
+ * applies, and one is required since this always changes `assetUrl`. See
+ * `CatalogMod.checksum`.
  */
-export async function acceptModUpdate(mod: CatalogMod, checksum?: string): Promise<void> {
+export async function acceptModUpdate(mod: CatalogMod, checksum: string): Promise<void> {
   const p = mod.pendingUpdate;
   if (!p) return;
+  if (!checksum) {
+    throw new Error('Cannot accept a mod update without a checksum for the new release asset.');
+  }
   const fields = { tag: p.tag, assetName: p.assetName, assetUrl: p.assetUrl, version: p.version, gameVersion: p.gameVersion, checksum };
   const cleaned = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
   await updateDoc(doc(db, MODS_COLLECTION, mod.id), {
@@ -305,17 +326,20 @@ export async function rejectModUpdate(id: string): Promise<void> {
 
 /**
  * Approves an `unapproved` mod, making it publicly visible. Stamps the
- * reviewer and, if `checksum` is given (computed from the mod's `assetUrl`
- * via the launcher's `computeModChecksum` bridge call — see
- * `CatalogMod.checksum`), locks it in so the launcher can detect the release
- * asset being swapped out later.
+ * reviewer and `checksum` (computed from the mod's `assetUrl` via the
+ * launcher's `computeModChecksum` bridge call — see `CatalogMod.checksum`),
+ * which is required so the launcher can always detect the release asset
+ * being swapped out later.
  */
-export async function approveMod(id: string, reviewedBy: string, checksum?: string): Promise<void> {
+export async function approveMod(id: string, reviewedBy: string, checksum: string): Promise<void> {
+  if (!checksum) {
+    throw new Error('Cannot approve a mod without a checksum for its release asset.');
+  }
   await updateDoc(doc(db, MODS_COLLECTION, id), {
     status: 'approved' as CatalogModStatus,
     reviewedBy,
     reviewedAt: new Date().toISOString(),
-    ...(checksum ? { checksum } : {}),
+    checksum,
   });
 }
 

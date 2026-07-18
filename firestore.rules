@@ -149,7 +149,13 @@ service cloud.firestore {
 
       // Status transitions / re-resolving the release+asset are privileged;
       // an admin or the game's assigned developer can update or delete
-      // (reject) a mod doc.
+      // (reject) a mod doc. Any such write that changes `assetUrl` (a new or
+      // re-resolved release) must carry a non-empty `checksum` for that same
+      // asset in the same write — the client (see `updateModMetadata`/
+      // `approveMod`/`acceptModUpdate` in `useModCatalog.ts`) already
+      // enforces this, but it's re-checked here so a compromised/buggy
+      // client can't silently publish an unverified release. See
+      // `CatalogMod.checksum`.
       //
       // The original submitter additionally gets a narrow carve-out: they can
       // write *only* the `pendingUpdate` field (propose/replace/withdraw a
@@ -159,7 +165,13 @@ service cloud.firestore {
       // directly, since letting an approved mod's author freely edit it
       // after approval would defeat the review process — an admin/developer
       // must accept the request (`acceptModUpdate`) for it to take effect.
-      allow update: if isAdmin() || isDeveloperFor(resource.data.gameId)
+      allow update: if (
+          (isAdmin() || isDeveloperFor(resource.data.gameId))
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['assetUrl'])
+            || (request.resource.data.checksum is string && request.resource.data.checksum.size() > 0)
+          )
+        )
         || (
           request.auth != null
           && resource.data.submittedBy == request.auth.uid
