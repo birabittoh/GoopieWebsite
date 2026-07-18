@@ -19,6 +19,11 @@ function isWindows(): boolean {
   return typeof w.GetPlatform === 'function' && w.GetPlatform() === 'Windows';
 }
 
+function isLinux(): boolean {
+  const w = window as any;
+  return typeof w.GetPlatform === 'function' && w.GetPlatform() === 'Linux';
+}
+
 interface LauncherUpdateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -71,6 +76,19 @@ export function LauncherUpdateDialog({ open, onOpenChange }: LauncherUpdateDialo
               </DialogDescription>
             </DialogHeader>
             {!isLauncherVersionAtLeast('1.7.0') && isWindows() && (
+              <p className="text-sm rounded-md border p-3" style={{ borderColor: '#f59e0b', color: 'var(--theme-text-primary)', backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
+                Unfortunately, the self-update process will likely fail on this specific launcher version. If it
+                does, download the latest version from{' '}
+                <a
+                  href="https://goopie.xyz/#/downloads"
+                  onClick={e => { e.preventDefault(); openExternal('https://goopie.xyz/#/downloads'); }}
+                  className="underline cursor-pointer"
+                >
+                  here
+                </a>.
+              </p>
+            )}
+            {!isLauncherVersionAtLeast('1.7.1') && isLinux() && (
               <p className="text-sm rounded-md border p-3" style={{ borderColor: '#f59e0b', color: 'var(--theme-text-primary)', backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
                 Unfortunately, the self-update process will likely fail on this specific launcher version. If it
                 does, download the latest version from{' '}
