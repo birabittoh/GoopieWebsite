@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
-  Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil,
+  Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
@@ -19,6 +19,7 @@ import { useGameStore } from '../data/GameStore';
 import { useAuth } from '../auth/AuthContext';
 import { useBackgroundAccent } from '../theme/BackgroundAccentContext';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
+import { openExternal } from '../utils/externalLink';
 import {
   useModCatalog,
   submitMod,
@@ -29,6 +30,10 @@ import {
   requireMod,
   unrequireMod,
   updateModMetadata,
+  requestModUpdate,
+  cancelModUpdate,
+  acceptModUpdate,
+  rejectModUpdate,
   type CatalogMod,
   type CatalogModStatus,
   type SubmitModInput,
@@ -147,10 +152,12 @@ interface ModMetaState {
   screenshotsText: string;
   /** One YouTube URL (or bare video ID) per line. */
   videosText: string;
+  /** Minimum game version this mod requires, e.g. "1.2.0" or "v1.2.0" (optional). */
+  gameVersion: string;
 }
 
 function emptyModMetaState(): ModMetaState {
-  return { name: '', author: '', description: '', version: '', iconUrl: '', requires: [], screenshotsText: '', videosText: '' };
+  return { name: '', author: '', description: '', version: '', iconUrl: '', requires: [], screenshotsText: '', videosText: '', gameVersion: '' };
 }
 
 /** Splits a `"modId >= 1.2.0"` / bare-`"modId"` requirement string into a row, the inverse of [`serializeRequirements`]. */
@@ -181,6 +188,7 @@ function modMetaStateFromCatalog(cm: CatalogMod): ModMetaState {
     requires: (cm.requires ?? []).map(parseRequirementString),
     screenshotsText: (cm.screenshots ?? []).join('\n'),
     videosText: (cm.videoUrls ?? []).join('\n'),
+    gameVersion: cm.gameVersion ?? '',
   };
 }
 
@@ -224,13 +232,19 @@ function ModMetaFieldsEditor({ state, onChange }: ModMetaFieldsEditorProps) {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs" style={labelStyle}>Version</label>
+          <label className="text-xs" style={labelStyle}>Mod version</label>
           <input value={state.version} onChange={e => onChange({ ...state, version: e.target.value })} placeholder="1.0.0" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
         </div>
         <div>
-          <label className="text-xs" style={labelStyle}>Icon URL</label>
-          <input value={state.iconUrl} onChange={e => onChange({ ...state, iconUrl: e.target.value })} placeholder="https://..." className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
+          <label className="text-xs" style={labelStyle}>
+            Game version <span className="opacity-70">(optional)</span>
+          </label>
+          <input value={state.gameVersion} onChange={e => onChange({ ...state, gameVersion: e.target.value })} placeholder="1.3.0" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
         </div>
+      </div>
+      <div>
+        <label className="text-xs" style={labelStyle}>Icon URL</label>
+        <input value={state.iconUrl} onChange={e => onChange({ ...state, iconUrl: e.target.value })} placeholder="https://..." className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
       </div>
 
       <div>
@@ -332,6 +346,7 @@ export function GameMods() {
   const [confirmReject, setConfirmReject] = useState<CatalogMod | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [editingMod, setEditingMod] = useState<CatalogMod | null>(null);
+  const [requestingUpdateFor, setRequestingUpdateFor] = useState<CatalogMod | null>(null);
 
   // Build the merged row model: correlate catalog entries with installed mods
   // by id (catalogMod.modId === installed.id).
@@ -417,7 +432,7 @@ export function GameMods() {
         style={{ backgroundColor: 'var(--theme-topbar-bg)', borderColor: 'var(--theme-border)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}
       >
         <Link to={`/library/${game.recompName}`}>
-          <Button variant="ghost" size="icon" className="shrink-0" style={{ color: 'var(--theme-text-primary)' }}>
+          <Button variant="ghost" size="icon" className="shrink-0 hover:bg-[var(--theme-item-selected)]" style={{ color: 'var(--theme-text-primary)' }}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
         </Link>
@@ -438,7 +453,7 @@ export function GameMods() {
             {hasEnabledCodeMod && (
               <div className="flex items-center gap-2 p-2.5 rounded-lg text-xs border shrink-0" style={{ backgroundColor: 'rgba(251,146,60,0.1)', borderColor: 'rgba(251,146,60,0.4)', color: '#fdba74' }}>
                 <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>Mods can run arbitrary code. Only install mods from people you trust.</span>
+                <span>Mods can run arbitrary code on your PC. Only install mods from people you trust.</span>
               </div>
             )}
             {errors.length > 0 && (
@@ -513,7 +528,7 @@ export function GameMods() {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <Button size="sm" variant="ghost" onClick={handleOpenFolder} title="Open mods folder" style={{ color: 'var(--theme-text-primary)' }}>
+              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={handleOpenFolder} title="Open mods folder" style={{ color: 'var(--theme-text-primary)' }}>
                 <FolderOpen className="w-4 h-4" />
               </Button>
               <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleBrowse} disabled={installing}>
@@ -547,7 +562,7 @@ export function GameMods() {
                 const name = row.catalogMod?.name ?? row.installed?.name ?? row.key;
                 const version = row.catalogMod?.version ?? row.installed?.version;
                 const author = row.catalogMod?.author ?? row.installed?.author;
-                const icon = row.installed?.icon;
+                const icon = row.installed?.icon || row.catalogMod?.iconUrl;
                 const isDragging = dragId === row.installed?.id;
                 const isFocused = focusedModId === row.key;
                 return (
@@ -580,7 +595,7 @@ export function GameMods() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        {status ? <StatusBadge status={status} /> : row.installed && <SideloadBadge />}
+                        {status && status !== 'approved' ? <StatusBadge status={status} /> : row.installed && <SideloadBadge />}
                         <p className="text-base font-semibold truncate" style={{ color: 'var(--theme-text-primary)' }}>
                           {name}{version && <span className="font-normal ml-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>v{version}</span>}
                         </p>
@@ -611,6 +626,7 @@ export function GameMods() {
                 row={focusedRow}
                 recompName={recompName}
                 privileged={privileged}
+                currentUserUid={user?.uid}
                 allCatalogMods={catalogMods}
                 installedMods={installedMods}
                 onRemove={(mod) => setConfirmRemove(mod)}
@@ -618,6 +634,10 @@ export function GameMods() {
                 onFetchMods={installedHook.fetchMods}
                 onReject={(cm) => setConfirmReject(cm)}
                 onEdit={(cm) => setEditingMod(cm)}
+                onRequestUpdate={(cm) => setRequestingUpdateFor(cm)}
+                onCancelUpdate={(cm) => cancelModUpdate(cm.id)}
+                onAcceptUpdate={(cm) => acceptModUpdate(cm, computeChecksumIfAvailable(cm.pendingUpdate?.assetUrl))}
+                onRejectUpdate={(cm) => rejectModUpdate(cm.id)}
                 onFocusMod={(key) => {
                   // A required/conflicting mod might be filtered out of view
                   // (status filter, installed-only, or a stale search) —
@@ -648,9 +668,13 @@ export function GameMods() {
       />
       <ConfirmDialog
         open={!!confirmReject}
-        title="Reject submission?"
-        description={`Reject and delete "${confirmReject?.name ?? ''}"? This can't be undone.`}
-        confirmLabel="Reject"
+        title={confirmReject?.status === 'unapproved' ? 'Reject submission?' : 'Delete mod?'}
+        description={
+          confirmReject?.status === 'unapproved'
+            ? `Reject and delete "${confirmReject?.name ?? ''}"? This can't be undone.`
+            : `Delete "${confirmReject?.name ?? ''}" from the catalog? This can't be undone.`
+        }
+        confirmLabel={confirmReject?.status === 'unapproved' ? 'Reject' : 'Delete'}
         onCancel={() => setConfirmReject(null)}
         onConfirm={() => { if (confirmReject) rejectMod(confirmReject.id); setConfirmReject(null); }}
       />
@@ -669,6 +693,15 @@ export function GameMods() {
       {editingMod && (
         <EditModModal mod={editingMod} onClose={() => setEditingMod(null)} />
       )}
+
+      {requestingUpdateFor && user && (
+        <RequestModUpdateModal
+          mod={requestingUpdateFor}
+          userUid={user.uid}
+          userName={user.username ?? user.email ?? 'Unknown'}
+          onClose={() => setRequestingUpdateFor(null)}
+        />
+      )}
     </div>
   );
 }
@@ -684,10 +717,32 @@ function waitForInstallToFinish(w: any): Promise<void> {
   });
 }
 
+/**
+ * Re-downloads `assetUrl` and hashes it via the launcher's `computeModChecksum`
+ * bridge call, for stamping onto a catalog entry at approve/accept-update
+ * time (see `CatalogMod.checksum`). Resolves to `undefined` (rather than
+ * throwing) when the asset has no URL yet, the running launcher predates
+ * `computeModChecksum`, or the call fails — callers fall back to approving
+ * without a checksum rather than blocking moderation on it.
+ */
+function computeChecksumIfAvailable(assetUrl: string | undefined): string | undefined {
+  if (!assetUrl) return undefined;
+  const w = window as any;
+  if (typeof w.computeModChecksum !== 'function') return undefined;
+  try {
+    const result = w.computeModChecksum(assetUrl);
+    return typeof result?.checksum === 'string' ? result.checksum : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface ModDetailPanelProps {
   row: ModRow;
   recompName: string;
   privileged: boolean;
+  /** Signed-in viewer's uid, used to offer update-request actions on mods they submitted themselves. */
+  currentUserUid: string | undefined;
   allCatalogMods: CatalogMod[];
   installedMods: ModInfo[] | null;
   onRemove: (mod: ModInfo) => void;
@@ -695,10 +750,14 @@ interface ModDetailPanelProps {
   onFetchMods: () => void;
   onReject: (cm: CatalogMod) => void;
   onEdit: (cm: CatalogMod) => void;
+  onRequestUpdate: (cm: CatalogMod) => void;
+  onCancelUpdate: (cm: CatalogMod) => void;
+  onAcceptUpdate: (cm: CatalogMod) => void;
+  onRejectUpdate: (cm: CatalogMod) => void;
   onFocusMod: (key: string) => void;
 }
 
-function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onFocusMod }: ModDetailPanelProps) {
+function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onAcceptUpdate, onRejectUpdate, onFocusMod }: ModDetailPanelProps) {
   const { catalogMod: cm, installed, isInstalled } = row;
   const [installingUrl, setInstallingUrl] = useState(false);
 
@@ -709,7 +768,7 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
   const requires = installed?.requires ?? cm?.requires ?? [];
   const conflicts = installed?.conflicts ?? [];
   const platform = installed?.platform ?? cm?.platform ?? [];
-  const gameVersion = installed?.game_version;
+  const gameVersion = installed?.game_version || cm?.gameVersion;
   const icon = installed?.icon || cm?.iconUrl;
 
   const canInstallFromUrl = isLauncherVersionAtLeast('1.7.0') && typeof (window as any).installModFromUrl === 'function';
@@ -730,11 +789,11 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
         if (!reqId || reqId === cm.modId || installedIds.has(reqId)) continue;
         const reqMod = allCatalogMods.find(m => m.modId === reqId);
         if (!reqMod?.assetUrl) continue; // nothing we can auto-install for this requirement
-        w.installModFromUrl(recompName, reqMod.assetUrl, reqMod.modId);
+        w.installModFromUrl(recompName, reqMod.assetUrl, reqMod.modId, reqMod.checksum);
         await waitForInstallToFinish(w);
       }
 
-      w.installModFromUrl(recompName, cm.assetUrl, cm.modId);
+      w.installModFromUrl(recompName, cm.assetUrl, cm.modId, cm.checksum);
       await waitForInstallToFinish(w);
     } finally {
       setInstallingUrl(false);
@@ -764,6 +823,7 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
       {description && <p className="text-sm leading-relaxed" style={{ color: 'var(--theme-text-secondary)' }}>{description}</p>}
 
       <div className="text-xs space-y-1" style={{ color: 'var(--theme-text-muted)' }}>
+        {gameVersion && <p>Requires game v{gameVersion}</p>}
         {requires.length > 0 && (
           <p>
             Requires:{' '}
@@ -791,8 +851,19 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
             Platforms: <PlatformBadges platform={platform} isCode />
           </p>
         )}
-        {gameVersion && <p>Requires game v{gameVersion}</p>}
-        {cm?.githubRepo && <p>Source: {cm.githubRepo}</p>}
+        {cm?.githubRepo && (
+          <p className="flex items-center gap-1">
+            Source:{' '}
+            <button
+              type="button"
+              onClick={() => openExternal(`https://github.com/${cm.githubRepo}`)}
+              className="inline-flex items-center gap-1 text-xs underline"
+              style={{ color: 'var(--theme-text-primary)' }}
+            >
+              <Github className="w-5 h-5" /> {cm.githubRepo}
+            </button>
+          </p>
+        )}
       </div>
 
       {cm && (cm.screenshots?.length || cm.videoUrls?.length) ? (
@@ -838,7 +909,7 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
         )}
         {installed && (
           <>
-            <Button size="sm" variant="ghost" onClick={() => onToggleEnabled(installed.id)} style={{ color: 'var(--theme-text-primary)' }}>
+            <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => onToggleEnabled(installed.id)} style={{ color: 'var(--theme-text-primary)' }}>
               {installed.enabled ? 'Disable' : 'Enable'}
             </Button>
             <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onRemove(installed)}>
@@ -847,14 +918,47 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
           </>
         )}
 
+        {privileged && cm && cm.pendingUpdate && (
+          <>
+            <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={() => onAcceptUpdate(cm)}>
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Accept update (v{cm.pendingUpdate.version})
+            </Button>
+            <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onRejectUpdate(cm)}>
+              <X className="w-3.5 h-3.5 mr-1" /> Reject update
+            </Button>
+          </>
+        )}
+
+        {!privileged && cm && currentUserUid && cm.submittedBy === currentUserUid && (
+          <>
+            {cm.pendingUpdate ? (
+              <>
+                <span className="text-xs self-center" style={{ color: 'var(--theme-text-muted)' }}>
+                  Update to v{cm.pendingUpdate.version} pending review
+                </span>
+                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => onRequestUpdate(cm)} style={{ color: 'var(--theme-text-primary)' }}>
+                  <Pencil className="w-3.5 h-3.5 mr-1" /> Edit request
+                </Button>
+                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => onCancelUpdate(cm)} style={{ color: 'var(--theme-text-primary)' }}>
+                  <X className="w-3.5 h-3.5 mr-1" /> Cancel request
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => onRequestUpdate(cm)} style={{ color: 'var(--theme-text-primary)' }}>
+                <Upload className="w-3.5 h-3.5 mr-1" /> Request update
+              </Button>
+            )}
+          </>
+        )}
+
         {privileged && cm && (
           <>
-            <Button size="sm" variant="ghost" onClick={() => onEdit(cm)} style={{ color: 'var(--theme-text-primary)' }}>
+            <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => onEdit(cm)} style={{ color: 'var(--theme-text-primary)' }}>
               <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
             </Button>
             {cm.status === 'unapproved' && (
               <>
-                <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={() => approveMod(cm.id, '' )}>
+                <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={() => approveMod(cm.id, '', computeChecksumIfAvailable(cm.assetUrl))}>
                   <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Approve
                 </Button>
                 <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onReject(cm)}>
@@ -864,28 +968,105 @@ function ModDetailPanel({ row, recompName, privileged, allCatalogMods, installed
             )}
             {cm.status === 'approved' && (
               <>
-                <Button size="sm" variant="ghost" onClick={() => featureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
+                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => featureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
                   <Star className="w-3.5 h-3.5 mr-1" /> Feature
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => requireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
+                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => requireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
                   <Lock className="w-3.5 h-3.5 mr-1" /> Require
                 </Button>
               </>
             )}
             {cm.status === 'featured' && (
-              <Button size="sm" variant="ghost" onClick={() => unfeatureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
+              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => unfeatureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
                 <Star className="w-3.5 h-3.5 mr-1" /> Unfeature
               </Button>
             )}
             {cm.status === 'required' && (
-              <Button size="sm" variant="ghost" onClick={() => unrequireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
+              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => unrequireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
                 <Lock className="w-3.5 h-3.5 mr-1" /> Unrequire
+              </Button>
+            )}
+            {cm.status !== 'unapproved' && (
+              <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onReject(cm)}>
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
               </Button>
             )}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+const modInputStyle = { backgroundColor: 'var(--theme-item-default)', color: 'var(--theme-text-primary)' };
+const modLabelStyle = { color: 'var(--theme-text-muted)' };
+
+interface ModDialogProps {
+  title: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+/** Shared dialog scaffold for the Submit/Edit/Request-update mod modals. */
+function ModDialog({ title, onClose, children }: ModDialogProps) {
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        className="sm:max-w-lg max-h-[85vh] overflow-y-auto"
+        style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+      >
+        <DialogHeader>
+          <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">{children}</div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ReleaseFetchRowProps {
+  tag: string;
+  onTagChange: (v: string) => void;
+  /** Omit to hide the asset-regex field (e.g. the update-request form, which is locked to the mod's existing selector). */
+  assetRegex?: string;
+  onAssetRegexChange?: (v: string) => void;
+  onFetch: () => void;
+  busy: boolean;
+  resolved: ResolvedAsset | null;
+  fetchLabel?: string;
+  /** Label prefix for the resolved line — "Resolved" for a fresh fetch, "Pinned" once saved. */
+  resolvedLabel?: string;
+}
+
+/** Shared "release tag + asset regex + Fetch from GitHub" row used by all three mod modals. */
+function ReleaseFetchRow({ tag, onTagChange, assetRegex, onAssetRegexChange, onFetch, busy, resolved, fetchLabel, resolvedLabel = 'Resolved' }: ReleaseFetchRowProps) {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs" style={modLabelStyle}>Release tag (optional, defaults to latest)</label>
+          <input value={tag} onChange={e => onTagChange(e.target.value)} className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+        </div>
+        {onAssetRegexChange && (
+          <div>
+            <label className="text-xs" style={modLabelStyle}>Asset regex (optional)</label>
+            <input value={assetRegex} onChange={e => onAssetRegexChange(e.target.value)} placeholder="for multi-mod releases" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+          </div>
+        )}
+      </div>
+
+      <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onFetch} disabled={busy} style={{ color: 'var(--theme-accent)' }}>
+        <RefreshCw className="w-3.5 h-3.5 mr-1" /> {fetchLabel ?? (resolved ? 'Re-fetch from GitHub' : 'Fetch from GitHub')}
+      </Button>
+
+      {resolved ? (
+        <p className="text-xs" style={modLabelStyle}>{resolvedLabel}: {resolved.tag} / {resolved.assetName}</p>
+      ) : (
+        <p className="text-xs flex items-center gap-1" style={modLabelStyle}>
+          <HelpCircle className="w-3 h-3 inline shrink-0" /> Fetch a release to resolve the download asset.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -964,8 +1145,11 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
               author: fetched.author || undefined,
               description: fetched.description || undefined,
               version: fetched.version || undefined,
-              iconUrl: fetched.icon || undefined,
+              // `fetched.icon` is a base64 data URL read from the zip's icon.png,
+              // not a link — `iconUrl` expects a real hosted image URL, so it's
+              // deliberately not auto-filled here; the submitter pastes one.
               requires: fetched.requires?.length ? fetched.requires.map(parseRequirementString) : undefined,
+              gameVersion: fetched.game_version || undefined,
             };
             fetchedModId = fetched.name ? sanitizeModId(fetched.name) : undefined;
             nextPlatform = fetched.platform;
@@ -988,6 +1172,7 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
         requires: prev.requires.length ? prev.requires : (fetchedMeta.requires ?? []),
         screenshotsText: prev.screenshotsText,
         videosText: prev.videosText,
+        gameVersion: prev.gameVersion || fetchedMeta.gameVersion || '',
       }));
       setModId(prev => prev || fetchedModId || sanitizeModId(fallbackName));
       setPlatform(prev => prev ?? nextPlatform);
@@ -1024,6 +1209,7 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
         iconUrl: meta.iconUrl || undefined,
         screenshots: parseUrlList(meta.screenshotsText),
         videoUrls: parseUrlList(meta.videosText),
+        gameVersion: meta.gameVersion.trim() || undefined,
         submittedBy: userUid,
         submittedByName: userName,
       };
@@ -1043,70 +1229,45 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
     }
   }, [resolved, modId, existingModIds, meta, platform, game.id, recompName, assetRegex, userUid, userName, onClose]);
 
-  const inputStyle = { backgroundColor: 'var(--theme-item-default)', color: 'var(--theme-text-primary)' };
-  const labelStyle = { color: 'var(--theme-text-muted)' };
-
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent
-        className="sm:max-w-lg max-h-[85vh] overflow-y-auto"
-        style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
-      >
-        <DialogHeader>
-          <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Submit a mod</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs" style={labelStyle}>GitHub repo (owner/repo or URL)</label>
-            <input value={repoInput} onChange={e => setRepoInput(e.target.value)} placeholder="owner/repo" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs" style={labelStyle}>Release tag (optional, defaults to latest)</label>
-              <input value={tag} onChange={e => setTag(e.target.value)} className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
-            </div>
-            <div>
-              <label className="text-xs" style={labelStyle}>Asset regex (optional)</label>
-              <input value={assetRegex} onChange={e => setAssetRegex(e.target.value)} placeholder="for multi-mod releases" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
-            </div>
-          </div>
+    <ModDialog title="Submit a mod" onClose={onClose}>
+      <div>
+        <label className="text-xs" style={modLabelStyle}>GitHub repo (owner/repo or URL)</label>
+        <input value={repoInput} onChange={e => setRepoInput(e.target.value)} placeholder="owner/repo" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+      </div>
 
-          <Button size="sm" variant="ghost" onClick={handleFetch} disabled={busy} style={{ color: 'var(--theme-accent)' }}>
-            <RefreshCw className="w-3.5 h-3.5 mr-1" /> {resolved ? 'Re-fetch from GitHub' : 'Fetch from GitHub'}
-          </Button>
+      <ReleaseFetchRow
+        tag={tag}
+        onTagChange={setTag}
+        assetRegex={assetRegex}
+        onAssetRegexChange={setAssetRegex}
+        onFetch={handleFetch}
+        busy={busy}
+        resolved={resolved}
+      />
+      {resolved && !canAutoFetchMetadata && (
+        <p className="text-xs flex items-center gap-1" style={modLabelStyle}>
+          <HelpCircle className="w-3 h-3 inline shrink-0" /> Not running in the launcher — metadata wasn't auto-filled; enter it below.
+        </p>
+      )}
 
-          {resolved ? (
-            <p className="text-xs" style={labelStyle}>Resolved: {resolved.tag} / {resolved.assetName}</p>
-          ) : (
-            <p className="text-xs flex items-center gap-1" style={labelStyle}>
-              <HelpCircle className="w-3 h-3 inline shrink-0" /> Fetch a release to resolve the download asset.
-            </p>
-          )}
-          {resolved && !canAutoFetchMetadata && (
-            <p className="text-xs flex items-center gap-1" style={labelStyle}>
-              <HelpCircle className="w-3 h-3 inline shrink-0" /> Not running in the launcher — metadata wasn't auto-filled; enter it below.
-            </p>
-          )}
+      <div>
+        <label className="text-xs" style={modLabelStyle}>Mod id (unique on-disk folder name)</label>
+        <input value={modId} onChange={e => setModId(sanitizeModId(e.target.value))} className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+        {existingModIds.has(modId) && <p className="text-xs text-red-300 mt-1">This id is already taken for this game.</p>}
+      </div>
 
-          <div>
-            <label className="text-xs" style={labelStyle}>Mod id (unique on-disk folder name)</label>
-            <input value={modId} onChange={e => setModId(sanitizeModId(e.target.value))} className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={inputStyle} />
-            {existingModIds.has(modId) && <p className="text-xs text-red-300 mt-1">This id is already taken for this game.</p>}
-          </div>
+      <ModMetaFieldsEditor state={meta} onChange={setMeta} />
 
-          <ModMetaFieldsEditor state={meta} onChange={setMeta} />
+      {error && <p className="text-xs text-red-300">{error}</p>}
 
-          {error && <p className="text-xs text-red-300">{error}</p>}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
-            <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSubmit} disabled={busy || !resolved}>
-              {busy ? 'Submitting...' : 'Submit'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
+        <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSubmit} disabled={busy || !resolved}>
+          {busy ? 'Submitting...' : 'Submit'}
+        </Button>
+      </div>
+    </ModDialog>
   );
 }
 
@@ -1118,8 +1279,73 @@ interface EditModModalProps {
 /** Privileged-only editor for an existing catalog entry's metadata — mirrors editing a game's details, using the same field set as [`SubmitModModal`]'s phase 2. */
 function EditModModal({ mod, onClose }: EditModModalProps) {
   const [meta, setMeta] = useState<ModMetaState>(() => modMetaStateFromCatalog(mod));
+  const [tag, setTag] = useState(mod.tag ?? '');
+  const [assetRegex, setAssetRegex] = useState(mod.assetRegex ?? '');
+  const [platform, setPlatform] = useState<string[] | undefined>(mod.platform);
+  const [resolved, setResolved] = useState<ResolvedAsset | null>(
+    mod.assetName && mod.assetUrl ? { repo: mod.githubRepo, tag: mod.tag ?? '', assetName: mod.assetName, assetUrl: mod.assetUrl } : null
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canAutoFetchMetadata = isLauncherVersionAtLeast('1.7.0') && typeof (window as any).fetchModMetadata === 'function';
+
+  // Re-resolves the repo's release/asset (same selector the mod already
+  // uses, so a multi-mod release still picks the right zip) and overwrites
+  // the metadata fields below with what's in the new zip's mod.toml — unlike
+  // the submit form's "only fill blanks" merge, this is an explicit re-sync
+  // action, so it's expected to actually update stale fields. The resolved
+  // tag is pinned on save, same as a fresh submission.
+  const handleFetch = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      let releases: GameRelease[];
+      try {
+        releases = await fetchReleases(mod.githubRepo);
+      } catch {
+        setError('Could not fetch releases for that repo.');
+        return;
+      }
+
+      const release = tag.trim() ? releases.find(r => r.tag === tag.trim()) : releases[0];
+      if (!release) { setError('No matching release found.'); return; }
+
+      const regex = assetRegex.trim();
+      const asset = regex
+        ? release.assets.find(a => { try { return new RegExp(regex).test(a.name); } catch { return false; } })
+        : (mod.assetName ? release.assets.find(a => a.name === mod.assetName) : undefined)
+          ?? release.assets.find(a => a.name.toLowerCase().endsWith('.zip'));
+      if (!asset) { setError('No matching asset (zip) found in that release.'); return; }
+
+      setResolved({ repo: mod.githubRepo, tag: release.tag, assetName: asset.name, assetUrl: asset.url });
+      setTag(release.tag);
+
+      if (canAutoFetchMetadata) {
+        try {
+          const fetched = (window as any).fetchModMetadata(asset.url);
+          if (fetched) {
+            setMeta(prev => ({
+              ...prev,
+              name: fetched.name || prev.name,
+              author: fetched.author || prev.author,
+              description: fetched.description || prev.description,
+              version: fetched.version || release.tag,
+              requires: fetched.requires?.length ? fetched.requires.map(parseRequirementString) : prev.requires,
+              gameVersion: fetched.game_version || prev.gameVersion,
+            }));
+            setPlatform(fetched.platform);
+          }
+        } catch {
+          // Fall back to whatever's already in the form.
+        }
+      } else {
+        setMeta(prev => ({ ...prev, version: release.tag }));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [mod.githubRepo, mod.assetName, tag, assetRegex, canAutoFetchMetadata]);
 
   const handleSave = useCallback(async () => {
     setError(null);
@@ -1134,6 +1360,11 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
         requires: serializeRequirements(meta.requires),
         screenshots: parseUrlList(meta.screenshotsText),
         videoUrls: parseUrlList(meta.videosText),
+        gameVersion: meta.gameVersion.trim() || undefined,
+        platform,
+        ...(resolved
+          ? { tag: resolved.tag, assetRegex: assetRegex.trim() || undefined, assetName: resolved.assetName, assetUrl: resolved.assetUrl }
+          : {}),
       };
       await updateModMetadata(mod.id, patch);
       onClose();
@@ -1142,33 +1373,166 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
     } finally {
       setBusy(false);
     }
-  }, [mod.id, meta, onClose]);
+  }, [mod.id, meta, platform, resolved, assetRegex, onClose]);
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent
-        className="sm:max-w-lg max-h-[85vh] overflow-y-auto"
-        style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
-      >
-        <DialogHeader>
-          <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Edit mod — {mod.name}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-            Source: {mod.githubRepo} ({mod.tag ?? 'latest'}, {mod.assetName ?? 'auto-detected asset'}). The mod id and source repo aren't editable here — reject and resubmit if either needs to change.
-          </p>
-          <ModMetaFieldsEditor state={meta} onChange={setMeta} />
+    <ModDialog title={`Edit mod — ${mod.name}`} onClose={onClose}>
+      <p className="text-xs" style={modLabelStyle}>
+        Source repo: {mod.githubRepo}.
+      </p>
 
-          {error && <p className="text-xs text-red-300">{error}</p>}
+      <ReleaseFetchRow
+        tag={tag}
+        onTagChange={setTag}
+        assetRegex={assetRegex}
+        onAssetRegexChange={setAssetRegex}
+        onFetch={handleFetch}
+        busy={busy}
+        resolved={resolved}
+        fetchLabel="Fetch from GitHub"
+        resolvedLabel="Pinned"
+      />
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="ghost" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
-            <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSave} disabled={busy}>
-              {busy ? 'Saving...' : 'Save changes'}
-            </Button>
-          </div>
+      <ModMetaFieldsEditor state={meta} onChange={setMeta} />
+
+      {error && <p className="text-xs text-red-300">{error}</p>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
+        <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSave} disabled={busy}>
+          {busy ? 'Saving...' : 'Save changes'}
+        </Button>
+      </div>
+    </ModDialog>
+  );
+}
+
+interface RequestModUpdateModalProps {
+  mod: CatalogMod;
+  userUid: string;
+  userName: string;
+  onClose: () => void;
+}
+
+/**
+ * Lets a mod's own submitter propose a new release without touching its
+ * published listing directly — approval status, name, description, etc. are
+ * untouched until an admin/developer accepts the request (see
+ * `acceptModUpdate`). Re-resolves the release using the mod's *existing*
+ * `assetRegex`/`assetName` selector (never editable here) so a GitHub
+ * release that bundles several mods' zips together still resolves to the
+ * one asset this mod has always used.
+ */
+function RequestModUpdateModal({ mod, userUid, userName, onClose }: RequestModUpdateModalProps) {
+  const pending = mod.pendingUpdate;
+  const [tag, setTag] = useState(pending?.tag ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<ResolvedAsset | null>(
+    pending ? { repo: mod.githubRepo, tag: pending.tag ?? '', assetName: pending.assetName, assetUrl: pending.assetUrl } : null
+  );
+  const [version, setVersion] = useState(pending?.version ?? '');
+  const [gameVersion, setGameVersion] = useState(pending?.gameVersion ?? '');
+
+  const canAutoFetchMetadata = isLauncherVersionAtLeast('1.7.0') && typeof (window as any).fetchModMetadata === 'function';
+
+  const handleFetch = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      let releases: GameRelease[];
+      try {
+        releases = await fetchReleases(mod.githubRepo);
+      } catch {
+        setError('Could not fetch releases for that repo.');
+        return;
+      }
+
+      const release = tag.trim() ? releases.find(r => r.tag === tag.trim()) : releases[0];
+      if (!release) { setError('No matching release found.'); return; }
+
+      const regex = mod.assetRegex?.trim();
+      const asset = regex
+        ? release.assets.find(a => { try { return new RegExp(regex).test(a.name); } catch { return false; } })
+        : (mod.assetName ? release.assets.find(a => a.name === mod.assetName) : undefined)
+          ?? release.assets.find(a => a.name.toLowerCase().endsWith('.zip'));
+      if (!asset) { setError('No matching asset (zip) found in that release.'); return; }
+
+      setResolved({ repo: mod.githubRepo, tag: release.tag, assetName: asset.name, assetUrl: asset.url });
+
+      if (canAutoFetchMetadata) {
+        try {
+          const fetched = (window as any).fetchModMetadata(asset.url);
+          if (fetched) {
+            setVersion(prev => prev || fetched.version || release.tag);
+            setGameVersion(prev => prev || fetched.game_version || '');
+          }
+        } catch {
+          // Fall back to manual entry below.
+        }
+      } else {
+        setVersion(prev => prev || release.tag);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [mod.githubRepo, mod.assetRegex, mod.assetName, tag, canAutoFetchMetadata]);
+
+  const handleSubmitRequest = useCallback(async () => {
+    if (!resolved) return;
+    setError(null);
+    setBusy(true);
+    try {
+      await requestModUpdate(mod.id, userUid, userName, {
+        tag: resolved.tag,
+        assetName: resolved.assetName,
+        assetUrl: resolved.assetUrl,
+        version: version.trim() || resolved.tag,
+        gameVersion: gameVersion.trim() || undefined,
+      });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to submit update request.');
+    } finally {
+      setBusy(false);
+    }
+  }, [resolved, mod.id, userUid, userName, version, gameVersion, onClose]);
+
+  return (
+    <ModDialog title={`Request update — ${mod.name}`} onClose={onClose}>
+      <p className="text-xs" style={modLabelStyle}>
+        Source repo ({mod.githubRepo}) is locked. Resolve the release you want to publish and submit it for an admin/developer to accept — your current listing stays unchanged until then.
+      </p>
+
+      <ReleaseFetchRow
+        tag={tag}
+        onTagChange={setTag}
+        onFetch={handleFetch}
+        busy={busy}
+        resolved={resolved}
+      />
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs" style={modLabelStyle}>Mod version</label>
+          <input value={version} onChange={e => setVersion(e.target.value)} placeholder="1.0.1" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
         </div>
-      </DialogContent>
-    </Dialog>
+        <div>
+          <label className="text-xs" style={modLabelStyle}>
+            Game version <span className="opacity-70">(optional)</span>
+          </label>
+          <input value={gameVersion} onChange={e => setGameVersion(e.target.value)} placeholder="1.3.0" className="w-full mt-1 px-2 py-1.5 rounded text-sm outline-none" style={modInputStyle} />
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-300">{error}</p>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
+        <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSubmitRequest} disabled={busy || !resolved}>
+          {busy ? 'Submitting...' : pending ? 'Update request' : 'Request update'}
+        </Button>
+      </div>
+    </ModDialog>
   );
 }

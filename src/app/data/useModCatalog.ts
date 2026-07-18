@@ -52,6 +52,19 @@ export interface CatalogMod {
   assetName?: string;
   /** Resolved download URL for the selected asset, cached after the first lookup. */
   assetUrl?: string;
+  /**
+   * SHA-256 hex digest of `assetUrl`'s content, computed by the launcher (see
+   * `computeModChecksum` in the bridge) at the moment an admin/developer
+   * approves this mod or accepts a `pendingUpdate` — never trust-on-first-use
+   * from the submitter, since a malicious submitter could just recompute
+   * their own checksum too. The launcher re-downloads and re-hashes the
+   * asset before installing and refuses to install on a mismatch, so a
+   * release asset swapped out after approval (e.g. a compromised GitHub
+   * repo) can't silently ship malware to players who already trust this
+   * catalog entry. Unset for mods approved before this field existed, or if
+   * the reviewer's launcher predates `computeModChecksum` support.
+   */
+  checksum?: string;
 
   // --- Mod manifest metadata, mirrored here for display without re-fetching the asset ---
   modId: string;
@@ -75,6 +88,13 @@ export interface CatalogMod {
   screenshots?: string[];
   /** YouTube video URLs (or bare video IDs) shown alongside screenshots. */
   videoUrls?: string[];
+  /**
+   * Minimum host application (game) version this mod requires, e.g.
+   * `"1.2.0"` (a leading `v` is also accepted) — mirrors the launcher's
+   * `mod.toml` `game_version` field (see `mods.rs`'s
+   * `parse_game_version_constraint`). Unset if the submitter didn't declare one.
+   */
+  gameVersion?: string;
 
   // --- Submission / moderation trail ---
   submittedBy: string;
@@ -82,6 +102,31 @@ export interface CatalogMod {
   submittedAt: string;
   reviewedBy?: string;
   reviewedAt?: string;
+
+  /**
+   * A submitter-proposed new release for this mod, awaiting admin/developer
+   * review — see [`requestModUpdate`]. Approving a mod locks its
+   * `githubRepo`/`modId` (see `EditModModal`'s copy), so this is how a
+   * submitter pushes a new version of their own mod without an admin having
+   * to do it for them or the mod losing its approved/featured/required
+   * status via reject-and-resubmit. Only one request lives at a time — a
+   * new `requestModUpdate` call overwrites it, and accepting/rejecting
+   * clears it back to `null`/undefined.
+   */
+  pendingUpdate?: PendingModUpdate | null;
+}
+
+/** See [`CatalogMod.pendingUpdate`]. */
+export interface PendingModUpdate {
+  /** Specific release tag this request resolved to. */
+  tag?: string;
+  assetName: string;
+  assetUrl: string;
+  version: string;
+  gameVersion?: string;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
 }
 
 /**
@@ -135,6 +180,7 @@ export interface SubmitModInput {
   iconUrl?: string;
   screenshots?: string[];
   videoUrls?: string[];
+  gameVersion?: string;
   submittedBy: string;
   submittedByName: string;
 }
@@ -144,7 +190,7 @@ export type ModMetadataPatch = Partial<
   Pick<
     CatalogMod,
     'githubRepo' | 'tag' | 'assetRegex' | 'assetName' | 'assetUrl' |
-    'name' | 'author' | 'description' | 'version' | 'platform' | 'requires' | 'iconUrl' | 'screenshots' | 'videoUrls'
+    'name' | 'author' | 'description' | 'version' | 'platform' | 'requires' | 'iconUrl' | 'screenshots' | 'videoUrls' | 'gameVersion'
   >
 >;
 
@@ -194,12 +240,82 @@ export async function updateModMetadata(id: string, patch: ModMetadataPatch): Pr
   await updateDoc(doc(db, MODS_COLLECTION, id), cleaned);
 }
 
-/** Approves an `unapproved` mod, making it publicly visible. Stamps the reviewer. */
-export async function approveMod(id: string, reviewedBy: string): Promise<void> {
+/** Fields a submitter resolves and proposes as their mod's next release. */
+export interface ModUpdateRequestInput {
+  tag?: string;
+  assetName: string;
+  assetUrl: string;
+  version: string;
+  gameVersion?: string;
+}
+
+/**
+ * Proposes a new release for a mod the caller submitted, pending admin/dev
+ * review. Overwrites any existing pending request for the same mod (there's
+ * only ever one at a time). Firestore rules restrict this write to the
+ * mod's own `submittedBy`, and scope it to the `pendingUpdate` field only —
+ * a submitter can't use this to change anything else about their listing.
+ */
+export async function requestModUpdate(
+  id: string,
+  submitterUid: string,
+  submitterName: string,
+  input: ModUpdateRequestInput,
+): Promise<void> {
+  const cleaned = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+  await updateDoc(doc(db, MODS_COLLECTION, id), {
+    pendingUpdate: {
+      ...cleaned,
+      requestedBy: submitterUid,
+      requestedByName: submitterName,
+      requestedAt: new Date().toISOString(),
+    },
+  });
+}
+
+/** Withdraws the caller's own pending update request without applying it. */
+export async function cancelModUpdate(id: string): Promise<void> {
+  await updateDoc(doc(db, MODS_COLLECTION, id), { pendingUpdate: null });
+}
+
+/**
+ * Applies `mod`'s pending update request onto its published release/version
+ * fields and clears the request. Admin/developer only (enforced by
+ * Firestore rules, which gate any write outside `pendingUpdate` to them).
+ * `checksum`, if given (computed from `p.assetUrl` via the launcher's
+ * `computeModChecksum` bridge call), replaces the mod's previous checksum —
+ * an accepted update ships a new asset, so the old checksum no longer
+ * applies. See `CatalogMod.checksum`.
+ */
+export async function acceptModUpdate(mod: CatalogMod, checksum?: string): Promise<void> {
+  const p = mod.pendingUpdate;
+  if (!p) return;
+  const fields = { tag: p.tag, assetName: p.assetName, assetUrl: p.assetUrl, version: p.version, gameVersion: p.gameVersion, checksum };
+  const cleaned = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+  await updateDoc(doc(db, MODS_COLLECTION, mod.id), {
+    ...cleaned,
+    pendingUpdate: null,
+  });
+}
+
+/** Dismisses a mod's pending update request without applying it. Admin/developer only. */
+export async function rejectModUpdate(id: string): Promise<void> {
+  await updateDoc(doc(db, MODS_COLLECTION, id), { pendingUpdate: null });
+}
+
+/**
+ * Approves an `unapproved` mod, making it publicly visible. Stamps the
+ * reviewer and, if `checksum` is given (computed from the mod's `assetUrl`
+ * via the launcher's `computeModChecksum` bridge call — see
+ * `CatalogMod.checksum`), locks it in so the launcher can detect the release
+ * asset being swapped out later.
+ */
+export async function approveMod(id: string, reviewedBy: string, checksum?: string): Promise<void> {
   await updateDoc(doc(db, MODS_COLLECTION, id), {
     status: 'approved' as CatalogModStatus,
     reviewedBy,
     reviewedAt: new Date().toISOString(),
+    ...(checksum ? { checksum } : {}),
   });
 }
 

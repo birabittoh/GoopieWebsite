@@ -10,6 +10,7 @@ import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 interface RequiredModDoc {
   modId: string;
   assetUrl?: string;
+  checksum?: string;
   name: string;
 }
 
@@ -159,7 +160,7 @@ export function useRunningGame({
 
     for (const mod of missing) {
       setRequiredModsDownload({ modName: mod.name, progress: 0 });
-      w.installModFromUrl(game.recompName, mod.assetUrl, mod.modId);
+      w.installModFromUrl(game.recompName, mod.assetUrl, mod.modId, mod.checksum);
 
       const ok = await new Promise<boolean>((resolve) => {
         const interval = setInterval(() => {

@@ -150,7 +150,26 @@ service cloud.firestore {
       // Status transitions / re-resolving the release+asset are privileged;
       // an admin or the game's assigned developer can update or delete
       // (reject) a mod doc.
-      allow update, delete: if isAdmin() || isDeveloperFor(resource.data.gameId);
+      //
+      // The original submitter additionally gets a narrow carve-out: they can
+      // write *only* the `pendingUpdate` field (propose/replace/withdraw a
+      // new release for their own mod — see `useModCatalog.ts`'s
+      // `requestModUpdate`/`cancelModUpdate`). This deliberately doesn't let
+      // them touch status, moderation fields, or any published metadata
+      // directly, since letting an approved mod's author freely edit it
+      // after approval would defeat the review process — an admin/developer
+      // must accept the request (`acceptModUpdate`) for it to take effect.
+      allow update: if isAdmin() || isDeveloperFor(resource.data.gameId)
+        || (
+          request.auth != null
+          && resource.data.submittedBy == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingUpdate'])
+          && (
+            request.resource.data.pendingUpdate == null
+            || request.resource.data.pendingUpdate.requestedBy == request.auth.uid
+          )
+        );
+      allow delete: if isAdmin() || isDeveloperFor(resource.data.gameId);
     }
 
   }
