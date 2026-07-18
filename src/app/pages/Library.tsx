@@ -145,9 +145,9 @@ export function Library() {
       }
     }
     if (!selectedGameId && filteredGames.length > 0) {
-      setSelectedGameId(filteredGames[0].id);
+      navigate(`/library/${filteredGames[0].recompName}`, { replace: true });
     }
-  }, [selectedGameId, visibleGames, filteredGames, urlRecompName]);
+  }, [selectedGameId, visibleGames, filteredGames, urlRecompName, navigate]);
 
   const selectedGame = visibleGames.find(g => g.id === selectedGameId);
 
@@ -433,17 +433,19 @@ export function Library() {
   // --- Callbacks ---
 
   const handleSelectGame = useCallback((id: string) => {
-    setSelectedGameId(id);
     setShowMobileDetail(true);
     setAudioKey(k => k + 1);
     const game = visibleGames.find(g => g.id === id);
+    if (game) {
+      navigate(`/library/${game.recompName}`, { replace: true });
+    }
     if (game?.backgroundAudio) {
       const urls = Array.isArray(game.backgroundAudio) ? game.backgroundAudio : [game.backgroundAudio];
       setChosenAudioUrl(urls.length > 0 ? urls[Math.floor(Math.random() * urls.length)] : undefined);
     } else {
       setChosenAudioUrl(undefined);
     }
-  }, [visibleGames]);
+  }, [visibleGames, navigate]);
 
   const getYouTubeVideoId = (url: string): string | null => {
     try {

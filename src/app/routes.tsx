@@ -26,15 +26,33 @@ function isInCEF(): boolean {
   return typeof (window as any)?.GetPlatform === 'function';
 }
 
-// Track whether we've already performed the initial CEF redirect. We only want
-// to bounce `/` → `/library` on the very first load inside the launcher; after
-// that, the user is free to visit Home explicitly via the sidebar. 
-let initialCEFRedirectDone = false;
+const LAST_ROUTE_KEY = 'goopie:lastRoute';
+
+function getLastRoute(): string | null {
+  try {
+    const path = localStorage.getItem(LAST_ROUTE_KEY);
+    return path && path !== '/' ? path : null;
+  } catch {
+    return null;
+  }
+}
+
+// Track whether we've already performed the initial redirect. We only want
+// to bounce `/` → (the last-opened page, or `/library` inside the launcher)
+// on the very first load; after that, the user is free to visit Home
+// explicitly via the sidebar.
+let initialRedirectDone = false;
 
 function RootRoute() {
-  if (isInCEF() && !initialCEFRedirectDone) {
-    initialCEFRedirectDone = true;
-    return <Navigate to="/library" replace />;
+  if (!initialRedirectDone) {
+    initialRedirectDone = true;
+    const lastRoute = getLastRoute();
+    if (lastRoute) {
+      return <Navigate to={lastRoute} replace />;
+    }
+    if (isInCEF()) {
+      return <Navigate to="/library" replace />;
+    }
   }
   return <Home />;
 }
