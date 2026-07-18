@@ -1152,7 +1152,7 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
               requires: fetched.requires?.length ? fetched.requires.map(parseRequirementString) : undefined,
               gameVersion: fetched.game_version || undefined,
             };
-            fetchedModId = fetched.name ? sanitizeModId(fetched.name) : undefined;
+            fetchedModId = fetched.folder_name ? sanitizeModId(fetched.folder_name) : (fetched.name ? sanitizeModId(fetched.name) : undefined);
             nextPlatform = fetched.platform;
           }
         } catch {
