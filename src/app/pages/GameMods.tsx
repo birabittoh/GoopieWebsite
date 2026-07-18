@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams, Link } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
   Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
@@ -321,6 +321,7 @@ function youtubeVideoId(input: string): string | null {
 
 export function GameMods() {
   const { recompName } = useParams<{ recompName: string }>();
+  const navigate = useNavigate();
   const { games } = useGameStore();
   const { user, canEditGame } = useAuth();
   const { setAccentColor } = useBackgroundAccent();
@@ -439,11 +440,13 @@ export function GameMods() {
         <h1 className="text-xl font-bold truncate flex-1 min-w-0" style={{ color: 'var(--theme-text-primary)' }}>
           Mods — {game.title}
         </h1>
-        {user && (
-          <Button size="sm" className="shrink-0 bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={() => setShowSubmitModal(true)}>
-            <Plus className="w-3.5 h-3.5 mr-1" /> Submit a mod
-          </Button>
-        )}
+        <Button
+          size="sm"
+          className="shrink-0 bg-[#1a6bc4] hover:bg-[#2080e0] text-white"
+          onClick={() => (user ? setShowSubmitModal(true) : navigate('/login'))}
+        >
+          <Plus className="w-3.5 h-3.5 mr-1" /> Submit a mod
+        </Button>
       </div>
 
       <div className="flex-1 overflow-hidden relative z-10">
