@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import { Play, FolderOpen, Trash2, Download, RefreshCw, ExternalLink, X, Settings2, RotateCcw, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
@@ -208,7 +209,17 @@ export function GameActionButtons({
     );
   }
 
-  if (!isInCEF) return null;
+  if (!isInCEF) {
+    return (
+      <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)]'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
+        <Link to="/downloads">
+          <Button className={`bg-[#5c7e10] hover:bg-[#78a00f] text-white ${btnPx}`}>
+            <Download className={`${iconSize} ${iconMr}`} /> Download Launcher
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (<>
     <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)] mb-4'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
