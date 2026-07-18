@@ -456,8 +456,10 @@ export function GameMods() {
 
       <div className="flex-1 overflow-hidden relative z-10">
         <div className="h-full flex gap-4 p-4 md:p-6">
-          {/* Left column: merged mod list */}
-          <div className="w-full md:w-1/3 min-w-[260px] flex flex-col gap-3 overflow-hidden">
+          {/* Left column: merged mod list. On phones the page is a two-step
+              flow — list, then detail — so the list hides while a mod is
+              focused and the detail panel takes over; ≥md they sit side by side. */}
+          <div className={`w-full md:w-1/3 min-w-[260px] flex-col gap-3 overflow-hidden ${focusedRow ? 'hidden md:flex' : 'flex'}`}>
             {hasEnabledCodeMod && (
               <div className="flex items-center gap-2 p-2.5 rounded-lg text-xs border shrink-0" style={{ backgroundColor: 'rgba(251,146,60,0.1)', borderColor: 'rgba(251,146,60,0.4)', color: '#fdba74' }}>
                 <ShieldAlert className="w-4 h-4 shrink-0" />
@@ -634,10 +636,19 @@ export function GameMods() {
             </div>
           </div>
 
-          {/* Right column: focused mod detail panel */}
-          <div className="hidden md:flex flex-1 overflow-y-auto rounded-lg p-6" style={{ backgroundColor: 'var(--theme-card-bg)' }}>
+          {/* Right column: focused mod detail panel (step 2 of the mobile flow) */}
+          <div className={`${focusedRow ? 'flex' : 'hidden'} md:flex flex-1 overflow-y-auto rounded-lg p-4 md:p-6`} style={{ backgroundColor: 'var(--theme-card-bg)' }}>
             {focusedRow ? (
-              <ModDetailPanel
+              <div className="w-full">
+                <button
+                  type="button"
+                  onClick={() => setFocusedModId(null)}
+                  className="md:hidden flex items-center gap-1 text-sm mb-3"
+                  style={{ color: 'var(--theme-text-primary)' }}
+                >
+                  <ArrowLeft className="w-4 h-4" /> All mods
+                </button>
+                <ModDetailPanel
                 row={focusedRow}
                 recompName={recompName}
                 privileged={privileged}
@@ -665,7 +676,8 @@ export function GameMods() {
                     listRef.current?.querySelector(`[data-mod-id="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
                   });
                 }}
-              />
+                />
+              </div>
             ) : (
               <p className="m-auto text-sm" style={{ color: 'var(--theme-text-muted)' }}>Select a mod to see details.</p>
             )}
