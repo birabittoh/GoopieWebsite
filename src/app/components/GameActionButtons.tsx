@@ -217,11 +217,22 @@ export function GameActionButtons({
   if (!isInCEF) {
     return (
       <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)]'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
-        <Link to="/downloads">
-          <Button className={`bg-[#5c7e10] hover:bg-[#78a00f] text-white ${btnPx}`}>
-            <Download className={`${iconSize} ${iconMr}`} /> Download Launcher
-          </Button>
-        </Link>
+        <div className={`flex flex-wrap gap-${compact ? '2' : '3'}`}>
+          <Link to="/downloads">
+            <Button className={`bg-[#5c7e10] hover:bg-[#78a00f] text-white ${btnPx}`}>
+              <Download className={`${iconSize} ${iconMr}`} /> Download Launcher
+            </Button>
+          </Link>
+          {showModsButton && (
+            <Button
+              className={`text-white ${btnPxSm}`}
+              style={{ backgroundColor: 'var(--theme-accent)' }}
+              onClick={onOpenMods}
+            >
+              <Package className={`${iconSize} ${iconMr}`} /> Mods
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
