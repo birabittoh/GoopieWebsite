@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { LogIn } from 'lucide-react';
+import { ArrowLeft, LogIn } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuth } from '../auth/AuthContext';
 
@@ -30,6 +30,15 @@ export function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative" style={{ backgroundColor: 'var(--theme-page-bg)' }}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-6 left-6 z-20 hover:bg-[var(--theme-item-selected)] hover:text-[var(--theme-text-primary)]"
+        style={{ color: 'var(--theme-text-primary)' }}
+        onClick={() => navigate(-1)}
+      >
+        <ArrowLeft className="w-5 h-5" />
+      </Button>
       <div className="w-full max-w-md relative z-10">
         <div className="rounded-lg p-8 shadow-2xl border" style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
           <div className="flex flex-col items-center mb-8">
