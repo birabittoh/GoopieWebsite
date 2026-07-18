@@ -577,8 +577,10 @@ export function GameMods() {
                     style={{
                       backgroundColor: isFocused ? 'var(--theme-item-selected)' : 'var(--theme-item-default)',
                       opacity: row.installed && !row.installed.enabled ? 0.5 : (isDragging ? 0.6 : 1),
-                      border: isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
-                      borderLeft: status === 'featured' ? '3px solid #facc15' : undefined,
+                      borderTop: isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
+                      borderRight: isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
+                      borderBottom: isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
+                      borderLeft: status === 'featured' ? '3px solid #facc15' : isFocused ? '1px solid var(--theme-accent)' : status === 'unapproved' ? '1px dashed rgba(148,163,184,0.6)' : '1px solid transparent',
                     }}
                   >
                     {showDragHandles && row.installed && (
