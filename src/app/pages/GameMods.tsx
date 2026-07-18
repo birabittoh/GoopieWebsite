@@ -817,6 +817,7 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
             {version && <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>v{version}</span>}
           </div>
           {author && <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>by {author}</p>}
+          {privileged && cm?.submittedByName && <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Submitted by {cm.submittedByName}</p>}
         </div>
       </div>
 
