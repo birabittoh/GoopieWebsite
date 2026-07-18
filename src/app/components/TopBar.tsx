@@ -85,7 +85,7 @@ export function TopBar({ searchQuery, onSearchChange, audioMuted, onToggleMute, 
           >
             <DownloadCloud className="w-5 h-5" />
             <span
-              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full animate-update-glow"
               style={{ backgroundColor: 'var(--theme-accent)' }}
               aria-hidden="true"
             />

@@ -14,6 +14,11 @@ import { useLauncherUpdate } from '../data/LauncherUpdateContext';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 import { openExternal } from '../utils/externalLink';
 
+function isWindows(): boolean {
+  const w = window as any;
+  return typeof w.GetPlatform === 'function' && w.GetPlatform() === 'Windows';
+}
+
 interface LauncherUpdateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -65,16 +70,16 @@ export function LauncherUpdateDialog({ open, onOpenChange }: LauncherUpdateDialo
                 A new launcher version{latestVersion ? ` (${latestVersion})` : ''} is available. Download and install it now? The launcher will restart automatically once the update is applied.
               </DialogDescription>
             </DialogHeader>
-            {!isLauncherVersionAtLeast('1.7.0') && (
+            {!isLauncherVersionAtLeast('1.7.0') && isWindows() && (
               <p className="text-sm rounded-md border p-3" style={{ borderColor: '#f59e0b', color: 'var(--theme-text-primary)', backgroundColor: 'rgba(245, 158, 11, 0.1)' }}>
-                Your launcher version is too old for the self-update process — it will probably fail. You can still try, but if it
-                doesn't work, download the latest version manually from{' '}
+                Unfortunately, the self-update process will likely fail on this specific launcher version. If it
+                does, download the latest version from{' '}
                 <a
                   href="https://goopie.xyz/#/downloads"
                   onClick={e => { e.preventDefault(); openExternal('https://goopie.xyz/#/downloads'); }}
                   className="underline cursor-pointer"
                 >
-                  goopie.xyz/#/downloads
+                  here
                 </a>.
               </p>
             )}

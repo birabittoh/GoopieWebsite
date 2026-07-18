@@ -2,3 +2,16 @@
 @import './tailwind.css';
 @import './theme.css';
 @import './scrollbars.css';
+
+@keyframes update-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--theme-accent);
+  }
+  50% {
+    box-shadow: 0 0 6px 2px var(--theme-accent);
+  }
+}
+
+.animate-update-glow {
+  animation: update-glow 2s ease-in-out infinite;
+}
