@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Trophy, LogOut, Shield, Code, UserIcon, Plus, X, Search, Clock, CheckCircle2, XCircle, MessageSquare, Trash2 } from 'lucide-react';
+import { Trophy, LogOut, Shield, Code, UserIcon, Plus, X, Search, Clock, CheckCircle2, XCircle, MessageSquare, Trash2, Pencil } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -21,7 +21,7 @@ const statusColors: Record<Game['status'], string> = {
 };
 
 export function Profile() {
-  const { user, logout, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest } = useAuth();
+  const { user, logout, canSetRoles, updateUsername, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest } = useAuth();
   const { games, saveGame } = useGameStore();
   const navigate = useNavigate();
   const [allUsers, setAllUsers] = useState<{ uid: string; username: string; email: string; role: Role; assignedGames: string[]; picture?: string }[]>([]);
@@ -35,6 +35,10 @@ export function Profile() {
   const [deletionRequestReason, setDeletionRequestReason] = useState('');
   const [deletionRequestStatus, setDeletionRequestStatus] = useState<'idle' | 'sending' | 'sent' | 'error' | 'already'>('idle');
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
+  const [editNameOpen, setEditNameOpen] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [editNameStatus, setEditNameStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [editNameError, setEditNameError] = useState('');
 
   const totalGames = games.length;
 
@@ -130,6 +134,16 @@ export function Profile() {
             <div className="flex-1 text-center md:text-left">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mb-2">
                 <h2 className="text-2xl md:text-4xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{user?.username || 'Guest'}</h2>
+                {user && (
+                  <button
+                    onClick={() => { setEditNameValue(user.username); setEditNameStatus('idle'); setEditNameError(''); setEditNameOpen(true); }}
+                    className="p-1.5 rounded hover:opacity-80 transition-opacity"
+                    style={{ color: 'var(--theme-text-muted)' }}
+                    title="Edit name"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
                 {user && (
                   <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${roleColors[user.role]}`}>
                     <RoleIcon className="w-3 h-3" />
@@ -441,6 +455,51 @@ export function Profile() {
           </div>
         )}
       </div>
+
+      {/* Edit Name Dialog */}
+      <Dialog open={editNameOpen} onOpenChange={setEditNameOpen}>
+        <DialogContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)' }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Edit Name</DialogTitle>
+            <DialogDescription style={{ color: 'var(--theme-text-muted)' }}>
+              This changes your display name on Goopie.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editNameValue}
+            onChange={e => setEditNameValue(e.target.value)}
+            maxLength={30}
+            placeholder="Display name"
+            style={{ backgroundColor: 'var(--theme-page-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+          />
+          {editNameStatus === 'error' && (
+            <p className="text-sm text-red-500">{editNameError || 'Failed to update name. Please try again.'}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditNameOpen(false)} style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)', backgroundColor: 'transparent' }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!editNameValue.trim() || editNameStatus === 'saving'}
+              onClick={async () => {
+                setEditNameStatus('saving');
+                const result = await updateUsername(editNameValue);
+                if (result === 'ok') {
+                  setEditNameOpen(false);
+                  setEditNameStatus('idle');
+                } else {
+                  setEditNameError(result);
+                  setEditNameStatus('error');
+                }
+              }}
+              className="text-white"
+              style={{ backgroundColor: 'var(--theme-item-selected)' }}
+            >
+              {editNameStatus === 'saving' ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Request Account Deletion Dialog */}
       <Dialog open={deletionRequestOpen} onOpenChange={setDeletionRequestOpen}>

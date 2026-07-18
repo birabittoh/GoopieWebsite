@@ -62,6 +62,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   canEditGame: (gameId: string) => boolean;
   canSetRoles: () => boolean;
+  updateUsername: (username: string) => Promise<string>;
   setUserRole: (uid: string, role: Role) => Promise<string>;
   assignGame: (uid: string, gameId: string) => Promise<string>;
   unassignGame: (uid: string, gameId: string) => Promise<string>;
@@ -93,11 +94,13 @@ async function getOrCreateUserDoc(firebaseUser: FirebaseUser): Promise<User> {
       const isDefaultAdmin = DEFAULT_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || '');
       const role = isDefaultAdmin ? 'admin' : (data.role || 'user');
 
-      // Update display name / photo if they changed on the Google side
+      // Update photo if it changed on the Google side. Username is deliberately
+      // NOT re-synced here — once stored, it's the user's own (possibly
+      // custom-edited) name, and re-syncing from Google would clobber edits
+      // made via updateUsername() on every login.
       try {
-        if (data.username !== firebaseUser.displayName || data.picture !== firebaseUser.photoURL) {
+        if (data.picture !== firebaseUser.photoURL) {
           await updateDoc(userRef, {
-            username: firebaseUser.displayName || data.username,
             picture: firebaseUser.photoURL || data.picture,
           });
         }
@@ -107,7 +110,7 @@ async function getOrCreateUserDoc(firebaseUser: FirebaseUser): Promise<User> {
 
       return {
         uid: firebaseUser.uid,
-        username: firebaseUser.displayName || data.username,
+        username: data.username || firebaseUser.displayName || 'Unknown',
         email: data.email,
         picture: firebaseUser.photoURL || data.picture,
         role,
@@ -222,6 +225,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canSetRoles = useCallback((): boolean => {
     return user?.role === 'admin';
   }, [user]);
+
+  const updateUsername = async (username: string): Promise<string> => {
+    if (!user) return 'Not logged in';
+    const trimmed = username.trim();
+    if (!trimmed) return 'Name cannot be empty';
+    if (trimmed.length > 30) return 'Name must be 30 characters or fewer';
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { username: trimmed });
+      setUser(prev => prev ? { ...prev, username: trimmed } : null);
+      return 'ok';
+    } catch {
+      return 'Failed to update name';
+    }
+  };
 
   const setUserRole = async (uid: string, role: Role): Promise<string> => {
     if (!user || user.role !== 'admin') return 'Permission denied';
@@ -414,7 +431,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, updateUsername, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest }}>
       {children}
     </AuthContext.Provider>
   );
