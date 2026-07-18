@@ -339,6 +339,11 @@ export function GameMods() {
   const { mods: installedMods, validation, dragId, listRef, toggleEnabled, handleReorder, onPointerDownHandle,
     handleRemove, handleBrowse, handleOpenFolder, installing, lastReport } = installedHook;
 
+  // Local mod management (sideload, mods folder, installed/not-installed
+  // state) only exists inside a launcher that ships the mods bridge — in the
+  // plain web build the page is a read-only catalog browser.
+  const canManageMods = isLauncherVersionAtLeast('1.7.0');
+
   const [search, setSearch] = useState('');
   const [installedFilter, setInstalledFilter] = useState<InstalledFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -497,6 +502,7 @@ export function GameMods() {
               )}
             </div>
 
+            {canManageMods && (
             <div className="flex flex-wrap gap-1.5 shrink-0">
               {(['all', 'installed', 'not-installed'] as InstalledFilter[]).map(f => (
                 <button
@@ -512,6 +518,7 @@ export function GameMods() {
                 </button>
               ))}
             </div>
+            )}
             <div className="flex flex-wrap gap-1.5 shrink-0">
               {(['all', 'required', 'featured', 'approved', 'unapproved'] as StatusFilter[])
                 .filter(f => f !== 'unapproved' || canSeeUnapproved)
@@ -530,6 +537,7 @@ export function GameMods() {
               ))}
             </div>
 
+            {canManageMods && (
             <div className="flex items-center gap-1.5 shrink-0">
               <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={handleOpenFolder} title="Open mods folder" style={{ color: 'var(--theme-text-primary)' }}>
                 <FolderOpen className="w-4 h-4" />
@@ -538,6 +546,7 @@ export function GameMods() {
                 <Upload className="w-3 h-3 mr-1" /> Sideload...
               </Button>
             </div>
+            )}
 
             {installing && (
               <div className="flex items-center gap-2 p-2 rounded-lg shrink-0" style={{ backgroundColor: 'var(--theme-item-selected)' }}>
@@ -616,9 +625,9 @@ export function GameMods() {
                         onClick={(e) => e.stopPropagation()}
                         className="shrink-0"
                       />
-                    ) : (
+                    ) : canManageMods ? (
                       <span className="text-xs shrink-0" style={{ color: 'var(--theme-text-muted)' }}>Not installed</span>
-                    )}
+                    ) : null}
                   </div>
                 );
               })}

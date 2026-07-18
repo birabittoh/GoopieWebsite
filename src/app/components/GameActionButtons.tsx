@@ -10,6 +10,7 @@ import type { Game } from '../types/game';
 import type { InstalledBuild, GameRelease, ReleaseAsset } from '../data/useGameReleases';
 import { updateRequiredForBuild } from '../utils/updateRequired';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
+import { isInLauncher } from '../utils/externalLink';
 
 /** Strip the game's recompName prefix off an asset/build filename so it reads
  *  as a short, human-friendly descriptor (e.g. "windows-x64-release.exe"). */
@@ -124,15 +125,19 @@ export function GameActionButtons({
   dlcInstalled,
   versionPicker,
 }: GameActionButtonsProps) {
-  // Visible only once a build is actually selected *and* installed (present in
-  // installedBuilds) — before that there's nothing to browse mods against yet.
+  // In the launcher, visible only once a build is actually selected *and*
+  // installed (present in installedBuilds) — before that there's nothing to
+  // browse mods against yet. In the plain web build there's no install state
+  // at all, so the button just opens the catalog in read-only browse mode.
   const showModsButton =
     !!onOpenMods &&
-    isLauncherVersionAtLeast('1.7.0') &&
     !!game.modsEnabled &&
-    isoInstalled &&
-    !!selectedBuild &&
-    installedBuilds.some(b => b.name === selectedBuild.name);
+    (isInLauncher()
+      ? isLauncherVersionAtLeast('1.7.0') &&
+        isoInstalled &&
+        !!selectedBuild &&
+        installedBuilds.some(b => b.name === selectedBuild.name)
+      : true);
   const [showTuDialog, setShowTuDialog] = useState(false);
 
   // Only relevant when the TU is optional — if it's required, no build (installed
