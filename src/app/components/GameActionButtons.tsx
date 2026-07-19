@@ -84,6 +84,7 @@ export interface GameActionButtonsProps {
     error: string | null | undefined;
     stale: boolean;
     updatedAt: number | null | undefined;
+    onRefresh?: () => void;
   };
 }
 
@@ -380,6 +381,7 @@ export function GameActionButtons({
             error={versionPicker.error ?? null}
             stale={versionPicker.stale}
             updatedAt={versionPicker.updatedAt ?? undefined}
+            onRefresh={versionPicker.onRefresh}
           />
           <InstalledBuildsList builds={installedBuilds} recompName={game.recompName} onPlay={onRequestPlay} onClose={onCloseRunningGame} onRemove={onRemoveBuild} runningBuild={runningBuildForSelectedGame} compact={compact} />
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { Check, ChevronDown, Package } from 'lucide-react';
+import { Check, ChevronDown, Package, RefreshCw } from 'lucide-react';
 import { Game } from '../types/game';
 import { GameRelease, InstalledInfo, ReleaseAsset } from '../data/useGameReleases';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -37,6 +37,9 @@ interface Props {
   stale?: boolean;
   /** Timestamp (ms) of when the currently-shown release data was fetched. */
   updatedAt?: number;
+  /** Force a re-fetch of the available versions/builds from GitHub, bypassing
+   *  the local cache. When omitted, the refresh control is hidden. */
+  onRefresh?: () => void;
   /** Use the smaller (mobile) trigger styling. */
   compact?: boolean;
 }
@@ -71,6 +74,7 @@ export function GameVersionPicker({
   error,
   stale,
   updatedAt,
+  onRefresh,
   compact,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -119,7 +123,22 @@ export function GameVersionPicker({
         }}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="font-semibold text-sm">Version & Build</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-sm">Version & Build</span>
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={loading}
+                className="inline-flex items-center justify-center w-6 h-6 rounded hover:opacity-80 transition-opacity disabled:opacity-50"
+                style={{ color: 'var(--theme-text-secondary)' }}
+                title="Refresh available versions & builds"
+                aria-label="Refresh available versions and builds"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            )}
+          </div>
           <label className="flex items-center gap-1 cursor-pointer select-none text-xs">
             <input
               type="checkbox"

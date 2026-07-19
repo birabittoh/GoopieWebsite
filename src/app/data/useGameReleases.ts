@@ -291,9 +291,9 @@ export function buildReleaseDownloadPrefix(repo: string, tag: string): string {
  * releases — the fallback entry is marked `stale: true` so the UI can warn
  * that the data may be outdated. Only throws when there's no cache at all.
  */
-export async function fetchReleases(repo: string): Promise<GameRelease[]> {
+export async function fetchReleases(repo: string, force = false): Promise<GameRelease[]> {
   const cached = releasesCache.get(repo) ?? loadPersistedReleases(repo);
-  if (cached && !cached.stale && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
+  if (!force && cached && !cached.stale && Date.now() - cached.fetchedAt < RELEASES_CACHE_TTL_MS) {
     releasesCache.set(repo, cached);
     return [...cached.releases].sort(compareReleasesNewestFirst);
   }
@@ -444,6 +444,11 @@ export function useGameReleases(game: Game | undefined) {
   const [selectedAsset, setSelectedAssetState] = useState<string | undefined>(undefined);
   const initializedForId = useRef<string | undefined>(undefined);
 
+  // Bumped by `refresh()` to force a fresh GitHub fetch (bypassing the
+  // in-memory/localStorage cache) for the "refresh available versions" button.
+  const [refreshTick, setRefreshTick] = useState(0);
+  const refresh = useCallback(() => setRefreshTick(t => t + 1), []);
+
   // Reload persisted selection when game changes.
   useEffect(() => {
     if (!game) {
@@ -470,7 +475,7 @@ export function useGameReleases(game: Game | undefined) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchReleases(repo)
+    fetchReleases(repo, refreshTick > 0)
       .then(list => {
         if (cancelled) return;
         setReleases(list);
@@ -485,7 +490,7 @@ export function useGameReleases(game: Game | undefined) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [repo]);
+  }, [repo, refreshTick]);
 
   // Visible releases according to nightly toggle, sorted newest-first by semver
   // so that visibleReleases[0] is always the latest (not dependent on GitHub's
@@ -589,6 +594,7 @@ export function useGameReleases(game: Game | undefined) {
     setShowIncompatible,
     setSelectedTag,
     setSelectedAsset,
+    refresh,
     platform,
     arch,
     protonReady,

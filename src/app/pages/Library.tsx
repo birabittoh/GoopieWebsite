@@ -193,6 +193,7 @@ export function Library() {
     selectedAsset,
     setSelectedTag,
     setSelectedAsset,
+    refresh: refreshReleases,
     loading: releasesLoading,
     error: releasesError,
     releasesStale,
@@ -512,7 +513,8 @@ export function Library() {
     error: releasesError,
     stale: releasesStale,
     updatedAt: releasesUpdatedAt,
-  }), [visibleReleases, compatibleAssets, launcherPlatform, protonReady, filterBuilds, showIncompatible, setShowIncompatible, selectedTag, selectedAsset, setSelectedTag, setSelectedAsset, showNightlies, setShowNightlies, releasesLoading, releasesError, releasesStale, releasesUpdatedAt]);
+    onRefresh: refreshReleases,
+  }), [visibleReleases, compatibleAssets, launcherPlatform, protonReady, filterBuilds, showIncompatible, setShowIncompatible, selectedTag, selectedAsset, setSelectedTag, setSelectedAsset, showNightlies, setShowNightlies, releasesLoading, releasesError, releasesStale, releasesUpdatedAt, refreshReleases]);
 
   const actionButtonsProps = selectedGame ? {
     game: selectedGame,
