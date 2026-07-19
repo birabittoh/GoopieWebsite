@@ -193,6 +193,41 @@ export interface Game {
    * the launcher — Goopie stores no mod data itself.
    */
   modsEnabled?: boolean;
+
+  /**
+   * When true, the launcher surfaces this game's leaderboards in the Manage
+   * tab. Defaults to false. Leaderboard data is read from the ReXGlue
+   * runtime's leaderboard folder, keyed by a numeric `view_id` per board
+   * that the game itself assigns no name to.
+   */
+  leaderboardsEnabled?: boolean;
+
+  /**
+   * Maps a leaderboard's numeric `view_id` (as a string key) to the
+   * human-readable name of that in-game leaderboard, e.g. `{ "1": "Best Lap
+   * Time", "4": "Total Score" }`. Boards with no entry here fall back to
+   * showing "View <id>".
+   */
+  leaderboardViewNames?: Record<string, string>;
+
+  /**
+   * Maps a leaderboard's numeric `view_id` (as a string key) to its sort
+   * order: `true` means ascending (lowest value ranks first, e.g. a lap
+   * time), `false`/absent means descending (highest value ranks first, e.g.
+   * a score). Used to re-rank rows after merging entries from multiple
+   * leaderboard store files, since no single file's row order can be
+   * trusted once combined.
+   */
+  leaderboardViewAscending?: Record<string, boolean>;
+
+  /**
+   * Maps a leaderboard's `view_id` to a further map of that board's numeric
+   * column `id` → human-readable column name, e.g.
+   * `{ "1": { "1": "Score", "2": "Time" } }`. Columns with no entry here
+   * fall back to showing "Column <id>". Column meanings are specific to
+   * each view, so the mapping is nested per view_id.
+   */
+  leaderboardColumnNames?: Record<string, Record<string, string>>;
 }
 
 export type CVarType = 'Int' | 'Float' | 'Bool' | 'Enum' | 'String';

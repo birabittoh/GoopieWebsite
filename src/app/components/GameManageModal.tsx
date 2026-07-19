@@ -62,6 +62,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
     })();
   const showLeaderboardsTab =
     isLauncherVersionAtLeast('1.7.0') &&
+    !!game.leaderboardsEnabled &&
     typeof (window as any).listLeaderboardFiles === 'function' &&
     (() => {
       const files = (window as any).listLeaderboardFiles(game.recompName);
@@ -355,7 +356,12 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
               )}
               {showLeaderboardsTab && (
                 <TabsContent value="leaderboards">
-                  <LeaderboardsPanel recompName={game.recompName} />
+                  <LeaderboardsPanel
+                    recompName={game.recompName}
+                    viewNames={game.leaderboardViewNames}
+                    columnNames={game.leaderboardColumnNames}
+                    viewAscending={game.leaderboardViewAscending}
+                  />
                 </TabsContent>
               )}
               {showSettingsTab && (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Trophy } from 'lucide-react';
 
 interface LeaderboardColumn {
@@ -18,6 +18,9 @@ interface LeaderboardBoard {
   viewId: number;
   rows: LeaderboardRow[];
 }
+
+/** Fallback column names used when a game defines no explicit column mapping. */
+const DEFAULT_COLUMN_NAMES: Record<number, string> = { 1: 'Score', 2: 'Time' };
 
 /** Windows FILETIME (100-ns intervals since 1601-01-01 UTC) → ms since Unix epoch. */
 const FILETIME_EPOCH_DIFF_MS = 11644473600000;
@@ -62,11 +65,36 @@ function formatColumnValue(column: LeaderboardColumn): string {
   return String(value);
 }
 
-interface LeaderboardsPanelProps {
-  recompName: string;
+/**
+ * Ranks a board's rows by its primary column (the lowest numeric column id
+ * present, e.g. "Score"). Re-ranking is necessary once rows have been merged
+ * from multiple leaderboard store files, since no single file's on-disk row
+ * order reflects the combined standings.
+ */
+function rankRows(rows: LeaderboardRow[], ascending: boolean): LeaderboardRow[] {
+  const primaryColumnId = Math.min(
+    ...rows.flatMap(row => row.columns.map(c => c.id)).filter(id => Number.isFinite(id)),
+  );
+  if (!Number.isFinite(primaryColumnId)) return rows;
+
+  return [...rows].sort((a, b) => {
+    const av = a.columns.find(c => c.id === primaryColumnId)?.value;
+    const bv = b.columns.find(c => c.id === primaryColumnId)?.value;
+    if (typeof av !== 'number' && typeof bv !== 'number') return 0;
+    if (typeof av !== 'number') return 1;
+    if (typeof bv !== 'number') return -1;
+    return ascending ? av - bv : bv - av;
+  });
 }
 
-export function LeaderboardsPanel({ recompName }: LeaderboardsPanelProps) {
+interface LeaderboardsPanelProps {
+  recompName: string;
+  viewNames?: Record<string, string>;
+  columnNames?: Record<string, Record<string, string>>;
+  viewAscending?: Record<string, boolean>;
+}
+
+export function LeaderboardsPanel({ recompName, viewNames, columnNames, viewAscending }: LeaderboardsPanelProps) {
   const [files, setFiles] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [boards, setBoards] = useState<LeaderboardBoard[] | null>(null);
@@ -90,6 +118,33 @@ export function LeaderboardsPanel({ recompName }: LeaderboardsPanelProps) {
     const result = w.getLeaderboards(recompName, Array.from(selected));
     setBoards(Array.isArray(result) ? result : []);
   }, [recompName, files, selected]);
+
+  // Each selected store file yields its own board per view_id (a game can
+  // accumulate multiple store files across title updates, e.g. one written
+  // under an old title id and one under a new one). Merge same-view_id
+  // boards across all selected files into a single table so scores from
+  // every file show up together, instead of one table per file.
+  const mergedBoards = useMemo(() => {
+    if (!boards) return null;
+    const byView = new Map<number, { viewId: number; titleIds: string[]; rows: LeaderboardBoard['rows'] }>();
+    for (const board of boards) {
+      let entry = byView.get(board.viewId);
+      if (!entry) {
+        entry = { viewId: board.viewId, titleIds: [], rows: [] };
+        byView.set(board.viewId, entry);
+      }
+      if (!entry.titleIds.includes(board.titleId)) entry.titleIds.push(board.titleId);
+      entry.rows.push(...board.rows);
+    }
+    return Array.from(byView.values())
+      .map(entry => ({ ...entry, rows: rankRows(entry.rows, !!viewAscending?.[String(entry.viewId)]) }))
+      .sort((a, b) => a.viewId - b.viewId);
+  }, [boards, viewAscending]);
+
+  // Store files are named after the hex title id the game itself writes to;
+  // anything else is a file a user has renamed/copied in (e.g. to preserve
+  // an old store), so only label the untouched hex-named file as "Live".
+  const fileLabel = (id: string) => (/^[0-9a-fA-F]{8}$/.test(id) ? `Live (${id})` : id);
 
   const toggleFile = (id: string) => {
     setSelected(prev => {
@@ -133,66 +188,74 @@ export function LeaderboardsPanel({ recompName }: LeaderboardsPanelProps) {
                   color: isSelected ? '#fff' : 'var(--theme-text-muted)',
                 }}
               >
-                {id}
+                {fileLabel(id)}
               </button>
             );
           })}
         </div>
       )}
 
-      {boards === null ? (
+      {mergedBoards === null ? (
         <p className="text-sm py-4 text-center" style={{ color: 'var(--theme-text-muted)' }}>
           Loading leaderboards…
         </p>
-      ) : boards.length === 0 ? (
+      ) : mergedBoards.length === 0 ? (
         <p className="text-sm py-4 text-center" style={{ color: 'var(--theme-text-muted)' }}>
           {selected.size === 0 ? 'Select a file above to view its leaderboards.' : 'No boards found in the selected file(s).'}
         </p>
       ) : (
         <div className="space-y-4">
-          {boards.map((board, bi) => (
-            <div key={`${board.titleId}-${board.viewId}-${bi}`} className="p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
+          {mergedBoards.map(board => (
+            <div key={board.viewId} className="p-3 rounded-lg" style={{ backgroundColor: 'var(--theme-item-default)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <Trophy className="w-4 h-4 shrink-0" style={{ color: '#f5c518' }} />
                 <p className="text-sm font-semibold" style={{ color: 'var(--theme-text-primary)' }}>
-                  View {board.viewId}
+                  {viewNames?.[String(board.viewId)] || `View ${board.viewId}`}
                 </p>
-                <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
-                  ({board.titleId})
-                </span>
               </div>
 
               {board.rows.length === 0 ? (
                 <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>No rows submitted yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr style={{ color: 'var(--theme-text-muted)' }}>
-                        <th className="text-left font-medium py-1 pr-3">#</th>
-                        <th className="text-left font-medium py-1 pr-3">Gamertag</th>
-                        <th className="text-left font-medium py-1">Columns</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {board.rows.map((row, ri) => (
-                        <tr key={row.xuid || ri} className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
-                          <td className="py-1.5 pr-3" style={{ color: 'var(--theme-text-muted)' }}>{ri + 1}</td>
-                          <td className="py-1.5 pr-3 font-medium" style={{ color: 'var(--theme-text-primary)' }}>
-                            {row.gamertag || row.xuid || 'Unknown'}
-                          </td>
-                          <td className="py-1.5" style={{ color: 'var(--theme-text-primary)' }}>
-                            {row.columns.length === 0
-                              ? '—'
-                              : row.columns
-                                  .map(c => `#${c.id}: ${formatColumnValue(c)}`)
-                                  .join('  ·  ')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                (() => {
+                  const columnIds = Array.from(new Set(board.rows.flatMap(row => row.columns.map(c => c.id)))).sort((a, b) => a - b);
+                  const viewColumnNames = columnNames?.[String(board.viewId)];
+                  const columnLabel = (id: number) =>
+                    viewColumnNames?.[String(id)] || DEFAULT_COLUMN_NAMES[id] || `Column ${id}`;
+                  return (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr style={{ color: 'var(--theme-text-muted)' }}>
+                            <th className="text-left font-medium py-1 pr-3" style={{ width: '2rem' }}>#</th>
+                            <th className="text-left font-medium py-1 pr-3" style={{ minWidth: '8rem' }}>Gamertag</th>
+                            {columnIds.map(id => (
+                              <th key={id} className="text-right font-medium py-1 pr-3" style={{ minWidth: '6rem' }}>{columnLabel(id)}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {board.rows.map((row, ri) => (
+                            <tr key={row.xuid || ri} className="border-t" style={{ borderColor: 'var(--theme-border)' }}>
+                              <td className="py-1.5 pr-3" style={{ color: 'var(--theme-text-muted)' }}>{ri + 1}</td>
+                              <td className="py-1.5 pr-3 font-medium" style={{ color: 'var(--theme-text-primary)' }}>
+                                {row.gamertag || row.xuid || 'Unknown'}
+                              </td>
+                              {columnIds.map(id => {
+                                const column = row.columns.find(c => c.id === id);
+                                return (
+                                  <td key={id} className="py-1.5 pr-3 text-right tabular-nums" style={{ color: 'var(--theme-text-primary)' }}>
+                                    {column ? formatColumnValue(column) : '—'}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()
               )}
             </div>
           ))}
