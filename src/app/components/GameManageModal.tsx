@@ -361,6 +361,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
                     viewNames={game.leaderboardViewNames}
                     columnNames={game.leaderboardColumnNames}
                     viewAscending={game.leaderboardViewAscending}
+                    titleId={game.titleId}
                   />
                 </TabsContent>
               )}

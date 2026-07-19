@@ -92,9 +92,10 @@ interface LeaderboardsPanelProps {
   viewNames?: Record<string, string>;
   columnNames?: Record<string, Record<string, string>>;
   viewAscending?: Record<string, boolean>;
+  titleId?: string;
 }
 
-export function LeaderboardsPanel({ recompName, viewNames, columnNames, viewAscending }: LeaderboardsPanelProps) {
+export function LeaderboardsPanel({ recompName, viewNames, columnNames, viewAscending, titleId }: LeaderboardsPanelProps) {
   const [files, setFiles] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [boards, setBoards] = useState<LeaderboardBoard[] | null>(null);
@@ -141,10 +142,13 @@ export function LeaderboardsPanel({ recompName, viewNames, columnNames, viewAsce
       .sort((a, b) => a.viewId - b.viewId);
   }, [boards, viewAscending]);
 
-  // Store files are named after the hex title id the game itself writes to;
-  // anything else is a file a user has renamed/copied in (e.g. to preserve
-  // an old store), so only label the untouched hex-named file as "Live".
-  const fileLabel = (id: string) => (/^[0-9a-fA-F]{8}$/.test(id) ? `Live (${id})` : id);
+  // A file merely *looking* like a hex title id isn't proof it's the real
+  // one — a user can copy/rename a file to the same-looking name. Only the
+  // id configured in Edit Game (read from the game's actual XEX/store) is
+  // trusted to mark the "Live" file; without one configured, nothing is
+  // labeled Live rather than guessing.
+  const fileLabel = (id: string) =>
+    titleId && id.toLowerCase() === titleId.toLowerCase() ? `Live (${id})` : id;
 
   const toggleFile = (id: string) => {
     setSelected(prev => {

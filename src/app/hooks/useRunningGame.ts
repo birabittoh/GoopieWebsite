@@ -128,7 +128,7 @@ export function useRunningGame({
     if (typeof w.clearLaunchError === 'function') w.clearLaunchError();
     const cvarArgs = composeCvarArgs();
     const cvarTypes = composeCvarTypes();
-    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name), JSON.stringify(cvarTypes));
+    w.Play(selectedGame.recompName, build.name, cvarArgs, undefined, selectedGame.setGameDataRootToAssets === true, shouldMountUpdate(selectedGame, build.asset || build.name), JSON.stringify(cvarTypes), selectedGame.titleId || '');
   }, [selectedGame, composeCvarArgs, composeCvarTypes, setAudioMuted]);
 
   const continueToPlay = useCallback((build: InstalledBuild) => {

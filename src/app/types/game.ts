@@ -98,6 +98,16 @@ export interface Game {
   externalLauncherUrl?: string;
 
   /**
+   * The game's 8-hex-digit Xbox 360 title id (e.g. "58410847"). Files on
+   * disk (leaderboard/achievement store files, save data, ...) are normally
+   * named after this id, but a file with the same-looking name can be
+   * copied/renamed by a user, so this is what the launcher trusts to
+   * identify the real one — currently used to pick the correct leaderboard
+   * store file to merge into and to label it "Live" in the Manage tab.
+   */
+  titleId?: string;
+
+  /**
    * When true, launcher will append `--game_data_root="<game>/assets"` on launch.
    * Existing games should default to false unless explicitly enabled.
    */

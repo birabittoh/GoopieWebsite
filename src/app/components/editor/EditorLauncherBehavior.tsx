@@ -287,6 +287,22 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
           For games with a proprietary launcher — shows a download/link button instead of the built-in launcher.
         </p>
       </div>
+      <div>
+        <label className={labelClass} style={labelStyle}>Title ID (optional)</label>
+        <Input
+          value={form.titleId || ''}
+          onChange={e => update('titleId', e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 8).toLowerCase() || undefined)}
+          placeholder="58410847"
+          className="w-40"
+          style={inputStyle}
+          disabled={readOnly}
+        />
+        <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+          The game's 8-hex-digit Xbox 360 title id. A user could copy a store file (e.g. a leaderboard file) under a
+          slightly different name, which would otherwise be mistaken for the real one — set this so the launcher can
+          always tell them apart.
+        </p>
+      </div>
     </EditorSection>
   );
 }
