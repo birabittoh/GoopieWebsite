@@ -38,6 +38,7 @@ import {
   type CatalogModStatus,
   type SubmitModInput,
   type ModMetadataPatch,
+  type PendingModUpdate,
 } from '../data/useModCatalog';
 import { useInstalledMods, type ModInfo } from '../hooks/useInstalledMods';
 import { getGitHubRepo, fetchReleases, type GameRelease } from '../data/useGameReleases';
@@ -371,6 +372,7 @@ export function GameMods() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [editingMod, setEditingMod] = useState<CatalogMod | null>(null);
   const [requestingUpdateFor, setRequestingUpdateFor] = useState<CatalogMod | null>(null);
+  const [reviewingUpdate, setReviewingUpdate] = useState<CatalogMod | null>(null);
 
   // Build the merged row model: correlate catalog entries with installed mods
   // by id (catalogMod.modId === installed.id).
@@ -690,8 +692,7 @@ export function GameMods() {
                 onEdit={(cm) => setEditingMod(cm)}
                 onRequestUpdate={(cm) => setRequestingUpdateFor(cm)}
                 onCancelUpdate={(cm) => cancelModUpdate(cm.id)}
-                onAcceptUpdate={(cm, checksum) => acceptModUpdate(cm, checksum)}
-                onRejectUpdate={(cm) => rejectModUpdate(cm.id)}
+                onReviewUpdate={(cm) => setReviewingUpdate(cm)}
                 onFocusMod={(key) => {
                   // A required/conflicting mod might be filtered out of view
                   // (status filter, installed-only, or a stale search) —
@@ -757,6 +758,15 @@ export function GameMods() {
           onClose={() => setRequestingUpdateFor(null)}
         />
       )}
+
+      {reviewingUpdate && (
+        <ReviewUpdateModal
+          mod={reviewingUpdate}
+          onClose={() => setReviewingUpdate(null)}
+          onAccept={(cm, checksum) => acceptModUpdate(cm, checksum)}
+          onReject={(cm) => rejectModUpdate(cm.id)}
+        />
+      )}
     </div>
   );
 }
@@ -807,12 +817,11 @@ interface ModDetailPanelProps {
   onEdit: (cm: CatalogMod) => void;
   onRequestUpdate: (cm: CatalogMod) => void;
   onCancelUpdate: (cm: CatalogMod) => void;
-  onAcceptUpdate: (cm: CatalogMod, checksum: string) => void;
-  onRejectUpdate: (cm: CatalogMod) => void;
+  onReviewUpdate: (cm: CatalogMod) => void;
   onFocusMod: (key: string) => void;
 }
 
-function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onAcceptUpdate, onRejectUpdate, onFocusMod }: ModDetailPanelProps) {
+function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onReviewUpdate, onFocusMod }: ModDetailPanelProps) {
   const { catalogMod: cm, installed, isInstalled } = row;
   const [installingUrl, setInstallingUrl] = useState(false);
   const [moderationError, setModerationError] = useState<string | null>(null);
@@ -872,16 +881,10 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
     approveMod(cm.id, '', checksum);
   }, [cm]);
 
-  const handleAcceptUpdate = useCallback(() => {
+  const handleReview = useCallback(() => {
     if (!cm) return;
-    const checksum = computeChecksumIfAvailable(cm.pendingUpdate?.assetUrl);
-    if (!checksum) {
-      setModerationError('Could not compute a checksum for the requested release. Accepting an update requires one.');
-      return;
-    }
-    setModerationError(null);
-    onAcceptUpdate(cm, checksum);
-  }, [cm, onAcceptUpdate]);
+    onReviewUpdate(cm);
+  }, [cm, onReviewUpdate]);
 
   return (
     <div className="w-full space-y-4">
@@ -1014,14 +1017,9 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         )}
 
         {privileged && cm && cm.pendingUpdate && (
-          <>
-            <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={handleAcceptUpdate}>
-              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Accept update (v{cm.pendingUpdate.version})
-            </Button>
-            <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={() => onRejectUpdate(cm)}>
-              <X className="w-3.5 h-3.5 mr-1" /> Reject update
-            </Button>
-          </>
+          <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleReview}>
+            Review (v{cm.pendingUpdate.version})
+          </Button>
         )}
 
         {!privileged && cm && currentUserUid && cm.submittedBy === currentUserUid && (
@@ -1646,6 +1644,96 @@ function RequestModUpdateModal({ mod, userUid, userName, onClose }: RequestModUp
         <Button variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
         <Button className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleSubmitRequest} disabled={busy || !resolved}>
           {busy ? 'Submitting...' : pending ? 'Update request' : 'Request update'}
+        </Button>
+      </div>
+    </ModDialog>
+  );
+}
+
+interface ReviewUpdateModalProps {
+  mod: CatalogMod;
+  onClose: () => void;
+  onAccept: (cm: CatalogMod, checksum: string) => void;
+  onReject: (cm: CatalogMod) => void;
+}
+
+function ReviewUpdateModal({ mod, onClose, onAccept, onReject }: ReviewUpdateModalProps) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const pending = mod.pendingUpdate;
+
+  const handleAccept = useCallback(async () => {
+    if (!pending) return;
+    setError(null);
+    const checksum = computeChecksumIfAvailable(pending.assetUrl);
+    if (!checksum) {
+      setError('Could not compute a checksum for the requested release. Accepting an update requires one.');
+      return;
+    }
+    setBusy(true);
+    try {
+      onAccept(mod, checksum);
+      onClose();
+    } catch {
+      setError('Failed to accept update.');
+    } finally {
+      setBusy(false);
+    }
+  }, [pending, mod, onAccept, onClose]);
+
+  const handleReject = useCallback(() => {
+    onReject(mod);
+    onClose();
+  }, [mod, onReject, onClose]);
+
+  if (!pending) return null;
+
+  const diffFields: { label: string; current: string | undefined; pending: string }[] = [
+    { label: 'Version', current: mod.version ?? undefined, pending: pending.version },
+    { label: 'Game version', current: mod.gameVersion ?? undefined, pending: pending.gameVersion ?? '' },
+  ];
+
+  return (
+    <ModDialog title={`Review update — ${mod.name}`} onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>
+          Requested by {pending.requestedByName} on {new Date(pending.requestedAt).toLocaleDateString()}.
+        </p>
+
+        {diffFields.map(({ label, current, pending: pendingVal }) => (
+          <div key={label}>
+            <label className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>{label}</label>
+            <div className="mt-1 space-y-1">
+              {current !== undefined && (
+                <div className="px-2 py-1 rounded text-sm line-through opacity-60" style={{ backgroundColor: 'rgba(248,113,113,0.15)', color: '#fca5a5' }}>
+                  {current || '(empty)'}
+                </div>
+              )}
+              <div className="px-2 py-1 rounded text-sm" style={{ backgroundColor: 'rgba(74,222,128,0.15)', color: '#86efac' }}>
+                {pendingVal || '(empty)'}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <div>
+          <label className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Release</label>
+          <div className="mt-1 px-2 py-1.5 rounded text-sm" style={{ backgroundColor: 'var(--theme-item-default)', color: 'var(--theme-text-secondary)' }}>
+            <p>{pending.tag} / {pending.assetName}</p>
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-300">{error}</p>}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={onClose} style={{ color: 'var(--theme-text-primary)' }}>Cancel</Button>
+        <Button size="sm" className="bg-[#8b1a1a] hover:bg-[#a52525] text-white" onClick={handleReject} disabled={busy}>
+          <X className="w-3.5 h-3.5 mr-1" /> Reject
+        </Button>
+        <Button size="sm" className="bg-green-700 hover:bg-green-600 text-white" onClick={handleAccept} disabled={busy}>
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> {busy ? 'Approving...' : 'Approve'}
         </Button>
       </div>
     </ModDialog>
