@@ -114,6 +114,8 @@ interface ModRow {
   catalogMod?: CatalogMod;
   installed?: ModInfo;
   isInstalled: boolean;
+  /** True when the catalog's published version is newer than what's installed on disk. */
+  updateAvailable: boolean;
 }
 
 type InstalledFilter = 'all' | 'installed' | 'not-installed';
@@ -122,6 +124,22 @@ type StatusFilter = 'all' | CatalogModStatus;
 /** Derives a slug from free text loosely matching the launcher's `sanitize_mod_id`: alphanumeric/-/_/. kept, else `_`. */
 function sanitizeModId(input: string): string {
   return input.replace(/[^a-zA-Z0-9\-_.]/g, '_');
+}
+
+/** Parses a mod version string (optionally `v`-prefixed) into a `[major, minor, patch]` triple, defaulting unparsed parts to 0. */
+function parseModVersion(version: string): [number, number, number] {
+  const cleaned = version.trim().replace(/^v/i, '');
+  const parts = cleaned.split('.').map(p => parseInt(p, 10));
+  return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+}
+
+/** True when `catalogVersion` is strictly newer than `installedVersion` by semver comparison. */
+function isNewerModVersion(catalogVersion: string, installedVersion: string): boolean {
+  const [cMaj, cMin, cPat] = parseModVersion(catalogVersion);
+  const [iMaj, iMin, iPat] = parseModVersion(installedVersion);
+  if (cMaj !== iMaj) return cMaj > iMaj;
+  if (cMin !== iMin) return cMin > iMin;
+  return cPat > iPat;
 }
 
 /** Parses `owner/repo` out of a full GitHub URL or a bare `owner/repo` string. */
@@ -366,12 +384,13 @@ export function GameMods() {
       if (cm.status === 'unapproved' && !privileged && cm.submittedBy !== user?.uid) continue;
       const installed = installedById.get(cm.modId);
       if (installed) usedInstalledIds.add(installed.id);
-      result.push({ key: cm.modId, catalogMod: cm, installed, isInstalled: !!installed });
+      const updateAvailable = !!installed && !!cm.version && !!installed.version && isNewerModVersion(cm.version, installed.version);
+      result.push({ key: cm.modId, catalogMod: cm, installed, isInstalled: !!installed, updateAvailable });
     }
 
     for (const im of installedMods ?? []) {
       if (usedInstalledIds.has(im.id)) continue;
-      result.push({ key: im.id, installed: im, isInstalled: true });
+      result.push({ key: im.id, installed: im, isInstalled: true, updateAvailable: false });
     }
 
     return result;
@@ -616,6 +635,15 @@ export function GameMods() {
                         <p className="text-base font-semibold truncate" style={{ color: 'var(--theme-text-primary)' }}>
                           {name}{version && <span className="font-normal ml-1.5 text-xs" style={{ color: 'var(--theme-text-muted)' }}>v{version}</span>}
                         </p>
+                        {row.updateAvailable && (
+                          <span
+                            className="shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: 'rgba(96,165,250,0.18)', color: '#60a5fa' }}
+                            title={`Update available: v${row.catalogMod?.version}`}
+                          >
+                            <Download className="w-3 h-3" /> Update
+                          </span>
+                        )}
                       </div>
                       {author && <p className="text-sm truncate" style={{ color: 'var(--theme-text-muted)' }}>{author}</p>}
                     </div>
@@ -963,6 +991,11 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         )}
         {!isInstalled && cm && !cm.assetUrl && (
           <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>No asset resolved yet.</p>
+        )}
+        {row.updateAvailable && cm?.assetUrl && canInstallFromUrl && (
+          <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstall} disabled={installingUrl}>
+            <Download className="w-3.5 h-3.5 mr-1" /> {installingUrl ? 'Updating...' : `Update to v${cm.version}`}
+          </Button>
         )}
         {installed && (
           <>
