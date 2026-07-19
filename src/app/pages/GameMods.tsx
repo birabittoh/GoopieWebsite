@@ -19,7 +19,7 @@ import { useGameStore } from '../data/GameStore';
 import { useAuth } from '../auth/AuthContext';
 import { useBackgroundAccent } from '../theme/BackgroundAccentContext';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
-import { openExternal } from '../utils/externalLink';
+import { openExternal, isInLauncher } from '../utils/externalLink';
 import {
   useModCatalog,
   submitMod,
@@ -991,6 +991,11 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         )}
         {!isInstalled && cm && !cm.assetUrl && (
           <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>No asset resolved yet.</p>
+        )}
+        {!isInLauncher() && cm?.assetUrl && (
+          <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => openExternal(cm.assetUrl!)} style={{ color: 'var(--theme-text-primary)' }}>
+            <Download className="w-3.5 h-3.5 mr-1" /> Download ZIP
+          </Button>
         )}
         {row.updateAvailable && cm?.assetUrl && canInstallFromUrl && (
           <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstall} disabled={installingUrl}>
