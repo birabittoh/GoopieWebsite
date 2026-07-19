@@ -36,6 +36,15 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
         disabled={readOnly}
       />
       <EditorToggle
+        checked={form.useXenosRenderer === true}
+        onChange={v => update('useXenosRenderer', v || undefined)}
+        label="Xenos Renderer"
+        description={form.useXenosRenderer
+          ? '— Launches with --gpu_plugin xenos'
+          : '— Uses the default GPU plugin'}
+        disabled={readOnly}
+      />
+      <EditorToggle
         checked={form.noAssetExtraction === true}
         onChange={v => update('noAssetExtraction', v || undefined)}
         label="No Asset Extraction"
