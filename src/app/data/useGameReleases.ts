@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Game } from '../types/game';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
+import { pickAssetPreservingTuStatus, pickAssetByDefaultBuildPreference } from '../utils/updateRequired';
 
 export interface ReleaseAsset {
   name: string;
@@ -556,6 +557,18 @@ export function useGameReleases(game: Game | undefined) {
       const preferred = `${game.recompName}${game.preferredAssetSuffix}`;
       const hit = compatibleAssets.find(a => a.name.toLowerCase() === preferred.toLowerCase());
       if (hit) return hit.name;
+    }
+    // The previously-selected asset (e.g. from a different version tag) no
+    // longer exists in this release — prefer a build here with the same TU
+    // status (vanilla stays vanilla, TU stays TU) over just taking the top
+    // of the sorted list.
+    const tuMatch = pickAssetPreservingTuStatus(game, selectedAsset, compatibleAssets);
+    if (tuMatch) return tuMatch.name;
+    // No asset has ever been selected for this game (first-time extraction) —
+    // honour the developer-configured default build (vanilla/TU) if set.
+    if (!selectedAsset) {
+      const preferenceMatch = pickAssetByDefaultBuildPreference(game, compatibleAssets);
+      if (preferenceMatch) return preferenceMatch.name;
     }
     // When the launcher provides a platform, trust the already-sorted list.
     if (platform && compatibleAssets.length > 0) return compatibleAssets[0].name;

@@ -22,6 +22,7 @@ import { BackgroundAudioPlayer } from '../components/BackgroundAudioPlayer';
 import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
 import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, detectAssetPlatform, isPlatformCompatible, isArchCompatible, findInstalledBuild, useGameReleases } from '../data/useGameReleases';
+import { pickAssetPreservingTuStatus } from '../utils/updateRequired';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 import { isInLauncher, isInTauriLauncher } from '../utils/externalLink';
 import { GameInfoSidebar } from '../components/GameInfoSidebar';
@@ -318,6 +319,11 @@ export function Library() {
           const preferred = `${selectedGame.recompName}${selectedGame.preferredAssetSuffix}`;
           asset = targetSorted.find(a => a.name.toLowerCase() === preferred.toLowerCase())?.name;
         }
+        // Prefer a build in the target release matching the currently
+        // installed build's TU status (vanilla stays vanilla, TU stays TU).
+        if (!asset) {
+          asset = pickAssetPreservingTuStatus(selectedGame, selectedBuild?.asset, targetSorted)?.name;
+        }
         if (!asset && launcherPlatform && targetSorted.length > 0) {
           asset = targetSorted[0].name;
         }
@@ -345,8 +351,14 @@ export function Library() {
     if (newerReleaseAvailable && updateInfo.tag) {
       setSelectedTag(updateInfo.tag);
     }
+    // Persist the asset actually installed/updated to, so future recomputation
+    // (e.g. on the next update) treats it as an explicit pick rather than
+    // falling back to the developer's first-install default-build preference.
+    if (updateInfo.asset) {
+      setSelectedAsset(updateInfo.asset);
+    }
     installation.setUpdating(true);
-  }, [selectedGame, updateInfo, newerReleaseAvailable, setSelectedTag, installation]);
+  }, [selectedGame, updateInfo, newerReleaseAvailable, setSelectedTag, setSelectedAsset, installation]);
 
   const removeBuild = useCallback((build: { name: string; version?: string; asset?: string }) => {
     setPendingRemoveBuild(build);

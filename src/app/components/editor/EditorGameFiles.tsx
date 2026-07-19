@@ -92,6 +92,25 @@ export function EditorGameFiles({ form, update, readOnly }: Props) {
             />
           </div>
         )}
+        {form.updateStatus === 'optional' && form.updateBuildPattern && (
+          <div className="mb-3">
+            <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>Default Build</label>
+            <Select
+              value={form.defaultBuildPreference || 'vanilla'}
+              onValueChange={v => update('defaultBuildPreference', v as Game['defaultBuildPreference'])}
+              disabled={readOnly}
+            >
+              <SelectTrigger className="w-full rounded-md text-sm border" style={inputStyle}><SelectValue /></SelectTrigger>
+              <SelectContent style={inputStyle}>
+                <SelectItem value="vanilla">Vanilla</SelectItem>
+                <SelectItem value="tu">Title Update</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
+              Which build is auto-selected the first time a user extracts assets for this game.
+            </p>
+          </div>
+        )}
         <div>
           <label className="text-xs mb-1 block" style={{ color: 'var(--theme-text-muted)' }}>DLC Names</label>
           <div className="flex flex-wrap gap-2 mb-2">

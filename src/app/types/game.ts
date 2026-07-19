@@ -129,6 +129,14 @@ export interface Game {
   updateChecksum?: string;
 
   /**
+   * Only meaningful when updateStatus === 'optional' and updateBuildPattern is
+   * set. Controls which build (vanilla or TU) is auto-selected the first time
+   * a user extracts assets for this game (i.e. before any build has ever been
+   * installed/selected). Missing = 'vanilla' for backwards compatibility.
+   */
+  defaultBuildPreference?: 'vanilla' | 'tu';
+
+  /**
    * Known DLC display names for this game. Used to match installed DLC
    * packages by their STFS display name header.
    */
