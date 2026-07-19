@@ -308,7 +308,7 @@ export function GameManageModal({ game, open, onClose, canEdit, onSaveGame, isIn
         >
           <DialogHeader>
             <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>
-              Manage — {game.title}
+              {game.title}
             </DialogTitle>
           </DialogHeader>
 

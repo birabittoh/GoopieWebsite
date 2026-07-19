@@ -464,7 +464,7 @@ export function GameMods() {
           </Button>
         </Link>
         <h1 className="text-xl font-bold truncate flex-1 min-w-0" style={{ color: 'var(--theme-text-primary)' }}>
-          Mods — {game.title}
+          Mods for {game.title}
         </h1>
         <Button
           size="sm"
