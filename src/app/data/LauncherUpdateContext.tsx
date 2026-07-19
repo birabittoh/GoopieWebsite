@@ -34,6 +34,18 @@ interface LauncherUpdateContextType {
   downloadString: string;
   /** Kick off the download & apply. The launcher restarts itself when done. */
   startSelfUpdate: () => void;
+  /** True when the running launcher supports an on-demand update recheck
+   *  (`window.RecheckLauncherUpdate`, launcher 1.7.2+). */
+  canRecheck: boolean;
+  /** True while an on-demand recheck is in flight. */
+  checking: boolean;
+  /** Timestamp (ms) of the last completed on-demand recheck, or null if none
+   *  has run this session — lets the UI show a "checked just now / up to date"
+   *  result after the user clicks "Check for updates". */
+  lastCheckedAt: number | null;
+  /** Force an immediate, off-schedule launcher-update check. No-op (and leaves
+   *  `checking` false) on launchers that don't support it. */
+  recheck: () => void;
 }
 
 const LauncherUpdateContext = createContext<LauncherUpdateContextType | null>(null);
@@ -51,7 +63,11 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
   const [updating, setUpdating] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(-1);
   const [downloadString, setDownloadString] = useState('');
+  const [canRecheck, setCanRecheck] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null);
   const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recheckPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll the cached native update check. Cheap: it's just an AtomicBool/Mutex
   // read on the Rust side, refreshed in the background roughly every hour.
@@ -61,6 +77,11 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
     if (typeof w.CheckForLauncherUpdate !== 'function') return;
 
     setCanSelfUpdate(typeof w.SelfUpdateLauncher === 'function');
+    setCanRecheck(
+      isLauncherVersionAtLeast('1.7.2') &&
+      typeof w.RecheckLauncherUpdate === 'function' &&
+      typeof w.isCheckingLauncherUpdate === 'function',
+    );
 
     const check = () => {
       const info = w.CheckForLauncherUpdate();
@@ -113,6 +134,38 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
     setUpdating(true);
   };
 
+  // Clean up the recheck poll on unmount.
+  useEffect(() => () => {
+    if (recheckPollRef.current) clearInterval(recheckPollRef.current);
+  }, []);
+
+  const recheck = () => {
+    const w = window as any;
+    if (checking) return;
+    if (typeof w.RecheckLauncherUpdate !== 'function' || typeof w.isCheckingLauncherUpdate !== 'function') return;
+    setChecking(true);
+    w.RecheckLauncherUpdate();
+    // Poll until the native check finishes, then read the refreshed cache.
+    // Unlike the periodic `check` above (which only ever flips the icon *on*),
+    // an explicit recheck applies the verdict in both directions so the user
+    // sees an accurate "up to date" result right after clicking.
+    if (recheckPollRef.current) clearInterval(recheckPollRef.current);
+    recheckPollRef.current = setInterval(() => {
+      if (w.isCheckingLauncherUpdate()) return;
+      if (recheckPollRef.current) {
+        clearInterval(recheckPollRef.current);
+        recheckPollRef.current = null;
+      }
+      const info = w.CheckForLauncherUpdate ? w.CheckForLauncherUpdate() : null;
+      if (info) {
+        setUpdateAvailable(!!info.hasUpdate);
+        setLatestVersion(info.latestVersion ?? null);
+      }
+      setLastCheckedAt(Date.now());
+      setChecking(false);
+    }, PROGRESS_POLL_MS);
+  };
+
   return (
     <LauncherUpdateContext.Provider
       value={{
@@ -123,6 +176,10 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
         downloadProgress,
         downloadString,
         startSelfUpdate,
+        canRecheck,
+        checking,
+        lastCheckedAt,
+        recheck,
       }}
     >
       {children}

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Check, ArrowLeft, FolderOpen, Globe, Wifi, WifiOff } from 'lucide-react';
+import { Check, ArrowLeft, FolderOpen, Globe, Wifi, WifiOff, RefreshCw, DownloadCloud } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 import { useTheme, type ThemeName } from '../theme/ThemeContext';
 import { getFpsEnabled, setFpsEnabled } from '../components/FpsCounter';
 import { isInTauriLauncher } from '../utils/externalLink';
 import { getLauncherVersion, isLauncherVersionAtLeast } from '../utils/launcherVersion';
+import { useLauncherUpdate } from '../data/LauncherUpdateContext';
 
 const languageOptions: { id: number; label: string }[] = [
   { id: 1, label: 'English' },
@@ -56,6 +57,7 @@ export function Settings() {
   const [reachable, setReachable] = useState(true);
   const launcherVersion = getLauncherVersion();
   const w = window as any;
+  const { canRecheck, checking, lastCheckedAt, recheck, updateAvailable, latestVersion, canSelfUpdate, updating, startSelfUpdate } = useLauncherUpdate();
 
   // Proton state — only populated on Linux launcher 1.3.0+.
   const isLinuxLauncher =
@@ -735,9 +737,52 @@ export function Settings() {
                 <div className="text-xs mt-1" style={{ color: 'var(--theme-text-muted)' }}>
                   Version of the GoopieLauncher app, for debugging.
                 </div>
+                {/* On-demand update check result (launcher 1.7.2+). */}
+                {canRecheck && !checking && lastCheckedAt !== null && (
+                  updateAvailable ? (
+                    <div className="text-xs mt-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-amber-400">
+                        Update available{latestVersion ? ` (${latestVersion})` : ''}.
+                      </span>
+                      {canSelfUpdate && (
+                        <button
+                          onClick={startSelfUpdate}
+                          disabled={updating}
+                          className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold disabled:opacity-60"
+                          style={{ backgroundColor: 'var(--theme-accent)', color: '#fff' }}
+                        >
+                          <DownloadCloud className="w-3.5 h-3.5" />
+                          {updating ? 'Updating…' : 'Update now'}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-xs mt-2 flex items-center gap-1 text-green-400">
+                      <Check className="w-3.5 h-3.5" /> You're on the latest version.
+                    </div>
+                  )
+                )}
               </div>
-              <div className="shrink-0 font-mono text-sm" style={{ color: 'var(--theme-text-muted)' }}>
-                {launcherVersion}
+              <div className="shrink-0 flex items-center gap-3">
+                <div className="font-mono text-sm" style={{ color: 'var(--theme-text-muted)' }}>
+                  {launcherVersion}
+                </div>
+                {canRecheck && (
+                  <button
+                    onClick={recheck}
+                    disabled={checking}
+                    className="inline-flex items-center gap-1.5 rounded-lg border-2 px-3 h-9 text-sm font-semibold transition-colors disabled:opacity-60"
+                    style={{
+                      borderColor: 'var(--theme-border)',
+                      backgroundColor: 'var(--theme-item-selected)',
+                      color: 'var(--theme-text-primary)',
+                    }}
+                    title="Check for launcher updates now"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+                    {checking ? 'Checking…' : 'Check for updates'}
+                  </button>
+                )}
               </div>
             </div>
           )}
