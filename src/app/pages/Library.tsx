@@ -249,6 +249,22 @@ export function Library() {
     }
   }, [visibleGames]);
 
+  // When the launcher is already running (e.g. collapsed to tray) and a
+  // desktop shortcut is clicked, the single-instance callback sets the
+  // auto-play game on AppState and dispatches this event so we can react
+  // even though the initial useEffect already ran.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const game = (e as CustomEvent).detail?.game;
+      if (!game) return;
+      autoPlayRef.current = game;
+      const found = visibleGames.find(g => g.recompName === game);
+      if (found) setSelectedGameId(found.id);
+    };
+    window.addEventListener('goopie:auto-play', handler);
+    return () => window.removeEventListener('goopie:auto-play', handler);
+  }, [visibleGames]);
+
   useEffect(() => {
     if (!autoPlayRef.current) return;
     if (!selectedGame || selectedGame.recompName !== autoPlayRef.current) return;
