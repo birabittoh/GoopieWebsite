@@ -129,7 +129,7 @@ export const router = createHashRouter([
     Component: withSuspense(VehicleBrowser),
   },
   {
-    path: '/:recompName/mods',
+    path: '/:recompName/mods/:modId?',
     Component: withSuspense(GameMods),
   },
   {

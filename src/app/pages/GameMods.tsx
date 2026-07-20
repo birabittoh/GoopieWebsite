@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router';
+import { useEffect, useMemo, useRef, useState, useCallback, useId } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
   Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Switch } from '../components/ui/switch';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { Markdown } from '../components/Markdown';
 import {
   Dialog,
   DialogContent,
@@ -339,8 +341,9 @@ function youtubeVideoId(input: string): string | null {
 }
 
 export function GameMods() {
-  const { recompName } = useParams<{ recompName: string }>();
+  const { recompName, modId: urlModId } = useParams<{ recompName: string; modId?: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { games } = useGameStore();
   const { user, canEditGame } = useAuth();
   const { setAccentColor } = useBackgroundAccent();
@@ -366,13 +369,25 @@ export function GameMods() {
   const [search, setSearch] = useState('');
   const [installedFilter, setInstalledFilter] = useState<InstalledFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [focusedModId, setFocusedModId] = useState<string | null>(null);
+  const [focusedModId, setFocusedModId] = useState<string | null>(urlModId ?? null);
   const [confirmRemove, setConfirmRemove] = useState<ModInfo | null>(null);
   const [confirmReject, setConfirmReject] = useState<CatalogMod | null>(null);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [editingMod, setEditingMod] = useState<CatalogMod | null>(null);
   const [requestingUpdateFor, setRequestingUpdateFor] = useState<CatalogMod | null>(null);
   const [reviewingUpdate, setReviewingUpdate] = useState<CatalogMod | null>(null);
+
+  // Select a mod and update the URL so it's shareable / back-button-friendly.
+  const selectMod = useCallback((key: string | null) => {
+    setFocusedModId(key);
+    const base = `/${recompName}/mods`;
+    navigate(key ? `${base}/${key}` : base, { replace: true });
+  }, [recompName, navigate]);
+
+  // Sync focusedModId when the user navigates with back/forward
+  useEffect(() => {
+    if (urlModId !== undefined) setFocusedModId(urlModId);
+  }, [urlModId]);
 
   // Build the merged row model: correlate catalog entries with installed mods
   // by id (catalogMod.modId === installed.id).
@@ -437,6 +452,13 @@ export function GameMods() {
 
   const showDragHandles = installedFilter === 'installed';
 
+  // Auto-select the first mod in the list when the page loads or filters change
+  useEffect(() => {
+    if (!focusedModId && sortedRows.length > 0) {
+      selectMod(sortedRows[0].key);
+    }
+  }, [sortedRows, focusedModId]);
+
   const focusedRow = sortedRows.find(r => r.key === focusedModId) ?? rows.find(r => r.key === focusedModId);
 
   if (!recompName) return null;
@@ -458,11 +480,20 @@ export function GameMods() {
         className="h-16 border-b flex items-center px-6 gap-4 relative z-20 shrink-0"
         style={{ backgroundColor: 'var(--theme-topbar-bg)', borderColor: 'var(--theme-border)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}
       >
-        <Link to={`/library/${game.recompName}`}>
+        <button
+          type="button"
+          onClick={() => {
+            if (searchParams.has('image')) {
+              setSearchParams({}, { replace: true });
+            } else {
+              navigate(`/library/${game.recompName}`);
+            }
+          }}
+        >
           <Button variant="ghost" size="icon" className="shrink-0 hover:bg-[var(--theme-item-selected)]" style={{ color: 'var(--theme-text-primary)' }}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-        </Link>
+        </button>
         <h1 className="text-xl font-bold truncate flex-1 min-w-0" style={{ color: 'var(--theme-text-primary)' }}>
           Mods for {game.title}
         </h1>
@@ -604,7 +635,7 @@ export function GameMods() {
                   <div
                     key={row.key}
                     data-mod-id={row.installed?.id ?? row.key}
-                    onClick={() => setFocusedModId(row.key)}
+                    onClick={() => selectMod(row.key)}
                     className="flex items-center gap-3 p-3 rounded-lg select-none cursor-pointer"
                     style={{
                       backgroundColor: isFocused ? 'var(--theme-item-selected)' : 'var(--theme-item-default)',
@@ -672,7 +703,7 @@ export function GameMods() {
               <div className="w-full">
                 <button
                   type="button"
-                  onClick={() => setFocusedModId(null)}
+                  onClick={() => selectMod(null)}
                   className="md:hidden flex items-center gap-1 text-sm mb-3"
                   style={{ color: 'var(--theme-text-primary)' }}
                 >
@@ -700,7 +731,7 @@ export function GameMods() {
                   setStatusFilter('all');
                   setInstalledFilter('all');
                   setSearch('');
-                  setFocusedModId(key);
+                  selectMod(key);
                   requestAnimationFrame(() => {
                     listRef.current?.querySelector(`[data-mod-id="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
                   });
@@ -802,6 +833,408 @@ function computeChecksumIfAvailable(assetUrl: string | undefined): string | unde
   }
 }
 
+type MediaSlide =
+  | { kind: 'video'; videoId: string }
+  | { kind: 'image'; url: string };
+
+function buildMediaSlides(cm: CatalogMod | undefined): MediaSlide[] {
+  if (!cm) return [];
+  const slides: MediaSlide[] = [];
+  for (const url of cm.videoUrls ?? []) {
+    const id = youtubeVideoId(url);
+    if (id) slides.push({ kind: 'video', videoId: id });
+  }
+  for (const url of cm.screenshots ?? []) {
+    slides.push({ kind: 'image', url });
+  }
+  return slides;
+}
+
+/** Singleton promise that loads the YouTube IFrame API script exactly once. */
+let ytApiPromise: Promise<void> | null = null;
+function ensureYtApi(): Promise<void> {
+  if (!ytApiPromise) {
+    ytApiPromise = new Promise<void>((resolve) => {
+      if ((window as any).YT?.Player) { resolve(); return; }
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      (window as any).onYouTubeIframeAPIReady = () => resolve();
+      document.head.appendChild(tag);
+    });
+  }
+  return ytApiPromise;
+}
+
+function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
+  const [zoomed, setZoomed] = useState(false);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const imgRef = useRef<HTMLImageElement>(null);
+  const dragState = useRef<{ startX: number; startY: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const setTransform = useCallback((x: number, y: number, scale: number) => {
+    if (imgRef.current) {
+      imgRef.current.style.transform = scale !== 1 ? `translate(${x}px, ${y}px) scale(${scale})` : '';
+    }
+  }, []);
+
+  const zoomIn = useCallback(() => {
+    setZoomed(true);
+    setTransform(offsetRef.current.x, offsetRef.current.y, 2);
+  }, [setTransform]);
+
+  const zoomOut = useCallback(() => {
+    setZoomed(false);
+    offsetRef.current = { x: 0, y: 0 };
+    setTransform(0, 0, 1);
+  }, [setTransform]);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragState.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      offsetX: offsetRef.current.x,
+      offsetY: offsetRef.current.y,
+      moved: false,
+    };
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragState.current) return;
+    const dx = e.clientX - dragState.current.startX;
+    const dy = e.clientY - dragState.current.startY;
+    if (!dragState.current.moved && Math.abs(dx) + Math.abs(dy) > 4) {
+      dragState.current.moved = true;
+    }
+    if (dragState.current.moved && zoomed) {
+      const nx = dragState.current.offsetX + dx;
+      const ny = dragState.current.offsetY + dy;
+      offsetRef.current = { x: nx, y: ny };
+      setTransform(nx, ny, 2);
+    }
+  }, [zoomed, setTransform]);
+
+  const onPointerUp = useCallback(() => {
+    const wasDrag = dragState.current?.moved;
+    dragState.current = null;
+    if (!wasDrag) {
+      if (zoomed) zoomOut(); else zoomIn();
+    }
+  }, [zoomed, zoomIn, zoomOut]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onWheel={(e) => {
+        e.preventDefault();
+        if (e.deltaY < 0 && !zoomed) zoomIn();
+        else if (e.deltaY > 0 && zoomed) zoomOut();
+      }}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-sm z-10 hover:scale-110 transition-transform"
+        style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#fff' }}
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <img
+        ref={imgRef}
+        src={url}
+        alt=""
+        className="select-none"
+        style={{
+          maxWidth: zoomed ? 'none' : '90vw',
+          maxHeight: zoomed ? 'none' : '90vh',
+          cursor: zoomed ? 'grab' : 'zoom-in',
+          touchAction: 'none',
+        }}
+        draggable={false}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      />
+
+      {zoomed && (
+        <span
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded-full backdrop-blur-sm"
+          style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
+        >
+          tap to zoom out · drag to pan
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MediaCarousel({ slides, modName }: { slides: MediaSlide[]; modName: string }) {
+  const [index, setIndex] = useState(0);
+  const [remountTickers, setRemountTickers] = useState<Record<number, number>>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+  const lightboxIndex = searchParams.has('image') ? parseInt(searchParams.get('image')!, 10) : -1;
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const prevIndexRef = useRef(0);
+  const iframeRefs = useRef<Map<number, HTMLIFrameElement>>(new Map());
+  const playersRef = useRef<Map<number, any>>(new Map());
+  const safeIndex = Math.min(index, Math.max(slides.length - 1, 0));
+
+  useEffect(() => { setIndex(0); setRemountTickers({}); prevIndexRef.current = 0; }, [slides.length]);
+
+  // Sync lightbox open/close with ?image search param
+  useEffect(() => {
+    const slide = slides[lightboxIndex];
+    if (slide && slide.kind === 'image') {
+      setLightboxUrl(slide.url);
+    } else {
+      setLightboxUrl(null);
+    }
+  }, [lightboxIndex, slides]);
+
+  const openLightbox = useCallback((url: string) => {
+    const slideIdx = slides.findIndex(s => s.kind === 'image' && s.url === url);
+    setLightboxUrl(url);
+    setSearchParams({ image: String(slideIdx >= 0 ? slideIdx : 0) });
+  }, [slides, setSearchParams]);
+
+  const closeLightbox = useCallback(() => {
+    setLightboxUrl(null);
+    setSearchParams({}, { replace: true });
+  }, [setSearchParams]);
+
+  // When the active slide changes, force-remount any video we're leaving so it stops playing
+  useEffect(() => {
+    const prevIndex = prevIndexRef.current;
+    if (prevIndex !== safeIndex && slides[prevIndex]?.kind === 'video') {
+      setRemountTickers(prev => ({ ...prev, [prevIndex]: (prev[prevIndex] ?? 0) + 1 }));
+    }
+    prevIndexRef.current = safeIndex;
+  }, [safeIndex, slides]);
+
+  // Auto-advance screenshots after 7 seconds (videos auto-advance via YT API)
+  useEffect(() => {
+    const slide = slides[safeIndex];
+    if (!slide || slide.kind !== 'image') return;
+    if (slides.length <= 1) return;
+    const timer = setTimeout(() => {
+      setIndex(prev => {
+        const n = (prev + 1) % slides.length;
+        if (n < prev) didWrapRef.current = true;
+        return n;
+      });
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [safeIndex, slides]);
+
+  // Destroy all YT.Player instances when iframes get remounted
+  useEffect(() => {
+    for (const [, player] of playersRef.current) {
+      try { player.destroy?.(); } catch { /* already gone */ }
+    }
+    playersRef.current.clear();
+  }, [remountTickers]);
+
+  // Create YT.Player instances and wire up onStateChange for auto-advance
+  useEffect(() => {
+    let cancelled = false;
+    ensureYtApi().then(() => {
+      if (cancelled) return;
+      slides.forEach((slide, i) => {
+        if (slide.kind !== 'video' || playersRef.current.has(i)) return;
+        const iframe = iframeRefs.current.get(i);
+        if (!iframe) return;
+        try {
+          const player = new (window as any).YT.Player(iframe, {
+            events: {
+              onStateChange: (event: any) => {
+                if (!cancelled && event.data === 0) {
+                  setIndex(prev => {
+                    const n = (prev + 1) % slides.length;
+                    if (n < prev) didWrapRef.current = true;
+                    return n;
+                  });
+                }
+              },
+            },
+          });
+          playersRef.current.set(i, player);
+        } catch { /* iframe not ready yet */ }
+      });
+    });
+    return () => { cancelled = true; };
+  }, [slides, remountTickers]);
+
+  // Clean up all players on unmount
+  useEffect(() => {
+    return () => {
+      for (const [, player] of playersRef.current) {
+        try { player.destroy?.(); } catch { /* already gone */ }
+      }
+      playersRef.current.clear();
+    };
+  }, []);
+
+  const prev = useCallback(() => setIndex(i => {
+    const next = (i - 1 + slides.length) % slides.length;
+    if (next > i) didWrapRef.current = true;
+    return next;
+  }), [slides.length]);
+  const next = useCallback(() => setIndex(i => {
+    const n = (i + 1) % slides.length;
+    if (n < i) didWrapRef.current = true;
+    return n;
+  }), [slides.length]);
+
+  // Keyboard navigation when the carousel is focused
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setIndex(i => { const n = (i - 1 + slides.length) % slides.length; if (n > i) didWrapRef.current = true; return n; });
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setIndex(i => { const n = (i + 1) % slides.length; if (n < i) didWrapRef.current = true; return n; });
+    }
+  }, [slides.length]);
+
+  // When the index wraps around, instantly jump the scroll position instead of
+  // smooth-scrolling through every intermediate slide.
+  const didWrapRef = useRef(false);
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const child = track.children[safeIndex] as HTMLElement | undefined;
+    if (!child) return;
+    if (didWrapRef.current) {
+      track.scrollLeft = child.offsetLeft;
+      didWrapRef.current = false;
+    } else {
+      child.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+    }
+  }, [safeIndex]);
+
+  if (slides.length === 0) return null;
+
+  return (
+    <div
+      className="relative w-full rounded-xl overflow-hidden select-none"
+      role="region"
+      aria-label="Media"
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+    >
+      {/* Main viewport */}
+      <div className="relative aspect-video w-full overflow-hidden" style={{ backgroundColor: '#000' }}>
+        {/* Slides track — a single row of full-width slides */}
+        <div ref={trackRef} className="flex h-full overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-hidden" style={{ WebkitOverflowScrolling: 'touch' }}>
+          {slides.map((slide, i) => (
+            <div key={i} className="w-full h-full shrink-0 snap-center flex items-center justify-center" style={{ backgroundColor: '#000' }}>
+              {slide.kind === 'video' ? (
+                <iframe
+                  key={`vid-${i}-${remountTickers[i] ?? 0}`}
+                  ref={(el) => { if (el) iframeRefs.current.set(i, el); }}
+                  src={`https://www.youtube.com/embed/${slide.videoId}?rel=0&enablejsapi=1&origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
+                  title={`${modName} video ${i + 1}`}
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  referrerPolicy="origin-when-cross-origin"
+                />
+              ) : (
+                <button type="button" onClick={() => openLightbox(slide.url)} className="w-full h-full flex items-center justify-center cursor-zoom-in">
+                  <img src={slide.url} alt={`${modName} screenshot ${i + 1}`} className="w-full h-full object-contain" draggable={false} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Navigation arrows — only shown when there are multiple slides */}
+        {slides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={prev}
+              aria-label="Previous"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-sm transition-opacity"
+              style={{ backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff' }}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={next}
+              aria-label="Next"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full backdrop-blur-sm transition-opacity"
+              style={{ backgroundColor: 'rgba(0,0,0,0.55)', color: '#fff' }}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
+        {/* Slide counter badge */}
+        {slides.length > 1 && (
+          <span
+            className="absolute bottom-2 right-2 text-[11px] font-medium px-2 py-0.5 rounded-full backdrop-blur-sm"
+            style={{ backgroundColor: 'rgba(0,0,0,0.55)', color: 'rgba(255,255,255,0.85)' }}
+          >
+            {safeIndex + 1} / {slides.length}
+          </span>
+        )}
+      </div>
+
+      {/* Thumbnail strip — centered */}
+      {slides.length > 1 && (
+        <div className="flex justify-center gap-1.5 px-3 py-2 overflow-x-auto scrollbar-hidden" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          {slides.map((slide, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setIndex(i)}
+              className="relative shrink-0 w-16 h-10 rounded-md overflow-hidden border-2 transition-colors"
+              style={{
+                borderColor: i === safeIndex ? '#fff' : 'rgba(255,255,255,0.15)',
+                opacity: i === safeIndex ? 1 : 0.6,
+              }}
+            >
+              {slide.kind === 'video' ? (
+                <img
+                  src={`https://img.youtube.com/vi/${slide.videoId}/mqdefault.jpg`}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  draggable={false}
+                />
+              ) : (
+                <img src={slide.url} alt="" className="w-full h-full object-cover" draggable={false} />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={closeLightbox} />}
+    </div>
+  );
+}
+
 interface ModDetailPanelProps {
   row: ModRow;
   recompName: string;
@@ -886,11 +1319,14 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
     onReviewUpdate(cm);
   }, [cm, onReviewUpdate]);
 
+  const mediaSlides = buildMediaSlides(cm);
+
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-5 pb-6">
+      {/* Header: icon + name + version + author */}
       <div className="flex items-start gap-4">
         <div
-          className="shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded-lg"
+          className="shrink-0 w-16 h-16 flex items-center justify-center overflow-hidden rounded-lg shadow-md"
           style={icon ? undefined : { backgroundColor: 'var(--theme-item-default)' }}
         >
           {icon ? <img src={icon} alt="" className="w-16 h-16 object-cover" /> : <Package className="w-6 h-6" style={{ color: 'var(--theme-text-muted)' }} />}
@@ -906,8 +1342,19 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         </div>
       </div>
 
-      {description && <p className="text-sm leading-relaxed" style={{ color: 'var(--theme-text-secondary)' }}>{description}</p>}
+      {/* Media carousel: YouTube videos first, then screenshots */}
+      {mediaSlides.length > 0 && (
+        <MediaCarousel slides={mediaSlides} modName={name} />
+      )}
 
+      {/* Description */}
+      {description && (
+        <div className="rounded-lg px-4 py-3" style={{ backgroundColor: 'var(--theme-item-default)', color: 'var(--theme-text-secondary)' }}>
+          <Markdown source={description} className="text-sm leading-relaxed" />
+        </div>
+      )}
+
+      {/* Metadata: requirements, conflicts, platform, source */}
       <div className="text-xs space-y-1" style={{ color: 'var(--theme-text-muted)' }}>
         {gameVersion && <p>Requires game v{gameVersion}</p>}
         {requires.length > 0 && (
@@ -952,41 +1399,11 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
         )}
       </div>
 
-      {cm && (cm.screenshots?.length || cm.videoUrls?.length) ? (
-        <div className="space-y-3">
-          {cm.screenshots && cm.screenshots.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {cm.screenshots.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noreferrer" className="block w-28 h-16 rounded overflow-hidden shrink-0" style={{ backgroundColor: 'var(--theme-item-default)' }}>
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                </a>
-              ))}
-            </div>
-          )}
-          {cm.videoUrls && cm.videoUrls.length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              {cm.videoUrls.map((url, i) => {
-                const id = youtubeVideoId(url);
-                if (!id) return null;
-                return (
-                  <div key={i} className="w-64 aspect-video rounded overflow-hidden shrink-0">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${id}`}
-                      title={`${name} video ${i + 1}`}
-                      className="w-full h-full"
-                      allowFullScreen
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : null}
-
+      {/* Moderation error */}
       {moderationError && <p className="text-xs text-red-300">{moderationError}</p>}
 
-      <div className="flex flex-wrap gap-2 pt-2 border-t" style={{ borderColor: 'var(--theme-border)' }}>
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2 pt-3 border-t" style={{ borderColor: 'var(--theme-border)' }}>
         {!isInstalled && cm?.assetUrl && canInstallFromUrl && (
           <Button size="sm" className="bg-[#1a6bc4] hover:bg-[#2080e0] text-white" onClick={handleInstall} disabled={installingUrl}>
             <Download className="w-3.5 h-3.5 mr-1" /> {installingUrl ? 'Installing...' : 'Install'}
@@ -1426,7 +1843,7 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
               ...prev,
               name: fetched.name || prev.name,
               author: fetched.author || prev.author,
-              description: fetched.description || prev.description,
+              description: prev.description || fetched.description,
               version: fetched.version || release.tag,
               requires: fetched.requires?.length ? fetched.requires.map(parseRequirementString) : prev.requires,
               gameVersion: fetched.game_version || prev.gameVersion,
