@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useId } from 'react';
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router';
+import { useParams, Link, useNavigate } from 'react-router';
+import { useGesture } from '@use-gesture/react';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
   Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
@@ -343,7 +344,7 @@ function youtubeVideoId(input: string): string | null {
 export function GameMods() {
   const { recompName, modId: urlModId } = useParams<{ recompName: string; modId?: string }>();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const { games } = useGameStore();
   const { user, canEditGame } = useAuth();
   const { setAccentColor } = useBackgroundAccent();
@@ -476,35 +477,31 @@ export function GameMods() {
 
   return (
     <div className="flex h-screen flex-col relative" style={{ backgroundColor: 'var(--theme-page-bg)' }}>
-      <div
-        className="h-16 border-b flex items-center px-6 gap-4 relative z-20 shrink-0"
-        style={{ backgroundColor: 'var(--theme-topbar-bg)', borderColor: 'var(--theme-border)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}
-      >
-        <button
-          type="button"
-          onClick={() => {
-            if (searchParams.has('image')) {
-              setSearchParams({}, { replace: true });
-            } else {
-              navigate(`/library/${game.recompName}`);
-            }
-          }}
+      {!lightboxOpen && (
+        <div
+          className="h-16 border-b flex items-center px-6 gap-4 relative z-20 shrink-0"
+          style={{ backgroundColor: 'var(--theme-topbar-bg)', borderColor: 'var(--theme-border)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}
         >
-          <Button variant="ghost" size="icon" className="shrink-0 hover:bg-[var(--theme-item-selected)]" style={{ color: 'var(--theme-text-primary)' }}>
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={() => navigate(`/library/${game.recompName}`)}
+          >
+            <Button variant="ghost" size="icon" className="shrink-0 hover:bg-[var(--theme-item-selected)]" style={{ color: 'var(--theme-text-primary)' }}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </button>
+          <h1 className="text-xl font-bold truncate flex-1 min-w-0" style={{ color: 'var(--theme-text-primary)' }}>
+            Mods for {game.title}
+          </h1>
+          <Button
+            size="sm"
+            className="shrink-0 bg-[#1a6bc4] hover:bg-[#2080e0] text-white"
+            onClick={() => (user ? setShowSubmitModal(true) : navigate('/login'))}
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" /> Submit a mod
           </Button>
-        </button>
-        <h1 className="text-xl font-bold truncate flex-1 min-w-0" style={{ color: 'var(--theme-text-primary)' }}>
-          Mods for {game.title}
-        </h1>
-        <Button
-          size="sm"
-          className="shrink-0 bg-[#1a6bc4] hover:bg-[#2080e0] text-white"
-          onClick={() => (user ? setShowSubmitModal(true) : navigate('/login'))}
-        >
-          <Plus className="w-3.5 h-3.5 mr-1" /> Submit a mod
-        </Button>
-      </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-hidden relative z-10">
         <div className="h-full flex gap-4 p-4 md:p-6">
@@ -736,6 +733,7 @@ export function GameMods() {
                     listRef.current?.querySelector(`[data-mod-id="${CSS.escape(key)}"]`)?.scrollIntoView({ block: 'nearest' });
                   });
                 }}
+                onLightboxChange={setLightboxOpen}
                 />
               </div>
             ) : (
@@ -866,10 +864,11 @@ function ensureYtApi(): Promise<void> {
 }
 
 function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
-  const [zoomed, setZoomed] = useState(false);
-  const offsetRef = useRef({ x: 0, y: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
-  const dragState = useRef<{ startX: number; startY: number; offsetX: number; offsetY: number; moved: boolean } | null>(null);
+  const scaleRef = useRef(1);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const gestureActive = useRef(false);
+  const dragMoved = useRef(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -883,57 +882,50 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
-  const setTransform = useCallback((x: number, y: number, scale: number) => {
+  const applyTransform = useCallback((scale: number, x: number, y: number) => {
     if (imgRef.current) {
       imgRef.current.style.transform = scale !== 1 ? `translate(${x}px, ${y}px) scale(${scale})` : '';
     }
   }, []);
 
-  const zoomIn = useCallback(() => {
-    setZoomed(true);
-    setTransform(offsetRef.current.x, offsetRef.current.y, 2);
-  }, [setTransform]);
+  const zoomTo = useCallback((target: number) => {
+    const clamped = Math.min(Math.max(target, 1), 5);
+    scaleRef.current = clamped;
+    if (clamped === 1) offsetRef.current = { x: 0, y: 0 };
+    applyTransform(clamped, offsetRef.current.x, offsetRef.current.y);
+  }, [applyTransform]);
 
-  const zoomOut = useCallback(() => {
-    setZoomed(false);
-    offsetRef.current = { x: 0, y: 0 };
-    setTransform(0, 0, 1);
-  }, [setTransform]);
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    dragState.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      offsetX: offsetRef.current.x,
-      offsetY: offsetRef.current.y,
-      moved: false,
-    };
-  }, []);
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragState.current) return;
-    const dx = e.clientX - dragState.current.startX;
-    const dy = e.clientY - dragState.current.startY;
-    if (!dragState.current.moved && Math.abs(dx) + Math.abs(dy) > 4) {
-      dragState.current.moved = true;
-    }
-    if (dragState.current.moved && zoomed) {
-      const nx = dragState.current.offsetX + dx;
-      const ny = dragState.current.offsetY + dy;
-      offsetRef.current = { x: nx, y: ny };
-      setTransform(nx, ny, 2);
-    }
-  }, [zoomed, setTransform]);
-
-  const onPointerUp = useCallback(() => {
-    const wasDrag = dragState.current?.moved;
-    dragState.current = null;
-    if (!wasDrag) {
-      if (zoomed) zoomOut(); else zoomIn();
-    }
-  }, [zoomed, zoomIn, zoomOut]);
+  const bind = useGesture({
+    onPinch: ({ offset: [s], first }) => {
+      if (first) gestureActive.current = true;
+      zoomTo(s);
+    },
+    onDragStart: () => { dragMoved.current = false; },
+    onDrag: ({ offset: [dx, dy] }) => {
+      if (!dragMoved.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        dragMoved.current = true;
+      }
+      if (dragMoved.current && scaleRef.current > 1) {
+        gestureActive.current = true;
+        offsetRef.current = { x: dx, y: dy };
+        applyTransform(scaleRef.current, dx, dy);
+      }
+    },
+    onDragEnd: () => {
+      if (!dragMoved.current) {
+        zoomTo(scaleRef.current > 1 ? 1 : 2);
+      }
+      setTimeout(() => { gestureActive.current = false; }, 0);
+    },
+    onPinchEnd: () => { setTimeout(() => { gestureActive.current = false; }, 0); },
+  }, {
+    drag: {
+      from: () => [offsetRef.current.x, offsetRef.current.y],
+    },
+    pinch: {
+      scaleBounds: { min: 1, max: 5 },
+    },
+  });
 
   return (
     <div
@@ -942,8 +934,8 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onWheel={(e) => {
         e.preventDefault();
-        if (e.deltaY < 0 && !zoomed) zoomIn();
-        else if (e.deltaY > 0 && zoomed) zoomOut();
+        if (e.deltaY < 0 && scaleRef.current === 1) zoomTo(2);
+        else if (e.deltaY > 0 && scaleRef.current > 1) zoomTo(1);
       }}
     >
       <button
@@ -962,18 +954,16 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
         alt=""
         className="select-none"
         style={{
-          maxWidth: zoomed ? 'none' : '90vw',
-          maxHeight: zoomed ? 'none' : '90vh',
-          cursor: zoomed ? 'grab' : 'zoom-in',
+          maxWidth: scaleRef.current > 1 ? 'none' : '90vw',
+          maxHeight: scaleRef.current > 1 ? 'none' : '90vh',
+          cursor: scaleRef.current > 1 ? 'grab' : 'zoom-in',
           touchAction: 'none',
         }}
         draggable={false}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        {...bind()}
       />
 
-      {zoomed && (
+      {scaleRef.current > 1 && (
         <span
           className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs px-2 py-1 rounded-full backdrop-blur-sm"
           style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
@@ -985,11 +975,9 @@ function ImageLightbox({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
-function MediaCarousel({ slides, modName }: { slides: MediaSlide[]; modName: string }) {
+function MediaCarousel({ slides, modName, onLightboxChange }: { slides: MediaSlide[]; modName: string; onLightboxChange: (open: boolean) => void }) {
   const [index, setIndex] = useState(0);
   const [remountTickers, setRemountTickers] = useState<Record<number, number>>({});
-  const [searchParams, setSearchParams] = useSearchParams();
-  const lightboxIndex = searchParams.has('image') ? parseInt(searchParams.get('image')!, 10) : -1;
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const prevIndexRef = useRef(0);
@@ -999,32 +987,26 @@ function MediaCarousel({ slides, modName }: { slides: MediaSlide[]; modName: str
 
   useEffect(() => { setIndex(0); setRemountTickers({}); prevIndexRef.current = 0; }, [slides.length]);
 
-  // Sync lightbox open/close with ?image search param
-  useEffect(() => {
-    const slide = slides[lightboxIndex];
-    if (slide && slide.kind === 'image') {
-      setLightboxUrl(slide.url);
-    } else {
-      setLightboxUrl(null);
-    }
-  }, [lightboxIndex, slides]);
-
   const openLightbox = useCallback((url: string) => {
-    const slideIdx = slides.findIndex(s => s.kind === 'image' && s.url === url);
     setLightboxUrl(url);
-    setSearchParams({ image: String(slideIdx >= 0 ? slideIdx : 0) });
-  }, [slides, setSearchParams]);
+    onLightboxChange(true);
+  }, [onLightboxChange]);
 
   const closeLightbox = useCallback(() => {
     setLightboxUrl(null);
-    setSearchParams({}, { replace: true });
-  }, [setSearchParams]);
+    onLightboxChange(false);
+  }, [onLightboxChange]);
 
-  // When the active slide changes, force-remount any video we're leaving so it stops playing
+  // When the active slide changes, force-remount any video we're leaving so it stops playing.
+  // Delay until after the scroll transition finishes so the old video stays visible during the slide.
   useEffect(() => {
     const prevIndex = prevIndexRef.current;
     if (prevIndex !== safeIndex && slides[prevIndex]?.kind === 'video') {
-      setRemountTickers(prev => ({ ...prev, [prevIndex]: (prev[prevIndex] ?? 0) + 1 }));
+      const timer = setTimeout(() => {
+        setRemountTickers(prev => ({ ...prev, [prevIndex]: (prev[prevIndex] ?? 0) + 1 }));
+      }, 400);
+      prevIndexRef.current = safeIndex;
+      return () => clearTimeout(timer);
     }
     prevIndexRef.current = safeIndex;
   }, [safeIndex, slides]);
@@ -1252,9 +1234,10 @@ interface ModDetailPanelProps {
   onCancelUpdate: (cm: CatalogMod) => void;
   onReviewUpdate: (cm: CatalogMod) => void;
   onFocusMod: (key: string) => void;
+  onLightboxChange: (open: boolean) => void;
 }
 
-function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onReviewUpdate, onFocusMod }: ModDetailPanelProps) {
+function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalogMods, installedMods, onRemove, onToggleEnabled, onFetchMods, onReject, onEdit, onRequestUpdate, onCancelUpdate, onReviewUpdate, onFocusMod, onLightboxChange }: ModDetailPanelProps) {
   const { catalogMod: cm, installed, isInstalled } = row;
   const [installingUrl, setInstallingUrl] = useState(false);
   const [moderationError, setModerationError] = useState<string | null>(null);
@@ -1344,7 +1327,7 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
 
       {/* Media carousel: YouTube videos first, then screenshots */}
       {mediaSlides.length > 0 && (
-        <MediaCarousel slides={mediaSlides} modName={name} />
+        <MediaCarousel slides={mediaSlides} modName={name} onLightboxChange={onLightboxChange} />
       )}
 
       {/* Description */}
