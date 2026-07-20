@@ -12,6 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { isOfflineMode } from '../utils/externalLink';
 
 const MODS_COLLECTION = 'mods';
 
@@ -150,7 +151,7 @@ export function useModCatalog(gameId: string): { mods: CatalogMod[]; loading: bo
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!gameId) {
+    if (!gameId || isOfflineMode()) {
       setMods([]);
       setLoading(false);
       return;
