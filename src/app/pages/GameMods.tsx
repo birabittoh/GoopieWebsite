@@ -1669,7 +1669,14 @@ function SubmitModModal({ game, recompName, userUid, userName, existingModIds, o
       if (canAutoFetchMetadata) {
         try {
           const fetched = (window as any).fetchModMetadata(asset.url);
-          if (fetched) {
+          // A failed read (bad zip, no `mod.toml`, download error, ...) comes
+          // back as a truthy `{ error }` object, not a thrown exception or
+          // `null` — without this check every field below would silently
+          // fall back to its "nothing fetched" default (e.g. version to the
+          // release tag) with no indication the fetch actually failed.
+          if (fetched?.error) {
+            setError(`Could not read mod.toml from the release asset: ${fetched.error}`);
+          } else if (fetched) {
             fetchedMeta = {
               name: fetched.name || undefined,
               author: fetched.author || undefined,
@@ -1857,7 +1864,13 @@ function EditModModal({ mod, onClose }: EditModModalProps) {
       if (canAutoFetchMetadata) {
         try {
           const fetched = (window as any).fetchModMetadata(asset.url);
-          if (fetched) {
+          // See SubmitModModal's handleFetch: a failed read comes back as a
+          // truthy `{ error }` object, not a thrown exception — treating it
+          // as valid metadata would silently overwrite version with the
+          // release tag instead of surfacing that the fetch actually failed.
+          if (fetched?.error) {
+            setError(`Could not read mod.toml from the release asset: ${fetched.error}`);
+          } else if (fetched) {
             setMeta(prev => ({
               ...prev,
               name: fetched.name || prev.name,
@@ -2012,7 +2025,13 @@ function RequestModUpdateModal({ mod, userUid, userName, onClose }: RequestModUp
       if (canAutoFetchMetadata) {
         try {
           const fetched = (window as any).fetchModMetadata(asset.url);
-          if (fetched) {
+          // See SubmitModModal's handleFetch: a failed read comes back as a
+          // truthy `{ error }` object, not a thrown exception — treating it
+          // as valid metadata would silently overwrite version with the
+          // release tag instead of surfacing that the fetch actually failed.
+          if (fetched?.error) {
+            setError(`Could not read mod.toml from the release asset: ${fetched.error}`);
+          } else if (fetched) {
             setVersion(fetched.version || release.tag);
             setGameVersion(fetched.game_version || '');
           }
