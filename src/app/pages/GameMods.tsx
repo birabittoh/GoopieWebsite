@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router';
 import { useGesture } from '@use-gesture/react';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
-  Star, Lock, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
+  Star, CheckCircle2, HelpCircle, Trash2, Upload, FolderOpen, Plus, X, Download, Pencil, Github,
   ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -30,8 +30,6 @@ import {
   rejectMod,
   featureMod,
   unfeatureMod,
-  requireMod,
-  unrequireMod,
   updateModMetadata,
   requestModUpdate,
   cancelModUpdate,
@@ -66,16 +64,14 @@ function PlatformBadges({ platform, isCode }: { platform: string[] | undefined; 
   );
 }
 
-/** Order Required → Featured → Approved → Unapproved, matching the catalog's status semantics. */
+/** Order Featured → Approved → Unapproved, matching the catalog's status semantics. */
 const STATUS_ORDER: Record<CatalogModStatus, number> = {
-  required: 0,
-  featured: 1,
-  approved: 2,
-  unapproved: 3,
+  featured: 0,
+  approved: 1,
+  unapproved: 2,
 };
 
 const STATUS_LABEL: Record<CatalogModStatus, string> = {
-  required: 'Required',
   featured: 'Featured',
   approved: 'Approved',
   unapproved: 'Unapproved',
@@ -83,7 +79,6 @@ const STATUS_LABEL: Record<CatalogModStatus, string> = {
 
 function StatusBadge({ status }: { status: CatalogModStatus }) {
   const colors: Record<CatalogModStatus, { bg: string; fg: string }> = {
-    required: { bg: 'rgba(248,113,113,0.18)', fg: '#f87171' },
     featured: { bg: 'rgba(250,204,21,0.18)', fg: '#facc15' },
     approved: { bg: 'rgba(74,222,128,0.18)', fg: '#4ade80' },
     unapproved: { bg: 'rgba(148,163,184,0.18)', fg: '#94a3b8' },
@@ -443,13 +438,13 @@ export function GameMods() {
   }, [rows, search, installedFilter, statusFilter]);
 
   // Installed mods form one contiguous, drag-reorderable block so dragging
-  // never has to hop over uninstalled rows: required/featured-but-uninstalled
-  // mods stay pinned above it (so they're still noticed), and everything else
+  // never has to hop over uninstalled rows: featured-but-uninstalled mods
+  // stay pinned above it (so they're still noticed), and everything else
   // uninstalled sinks below it.
   const rowGroup = useCallback((row: ModRow): 0 | 1 | 2 => {
     if (row.isInstalled) return 1;
     const status = row.catalogMod?.status;
-    return status === 'required' || status === 'featured' ? 0 : 2;
+    return status === 'featured' ? 0 : 2;
   }, []);
 
   const sortedRows = useMemo(() => {
@@ -589,7 +584,7 @@ export function GameMods() {
             </div>
             )}
             <div className="flex flex-wrap gap-1.5 shrink-0">
-              {(['all', 'required', 'featured', 'approved', 'unapproved'] as StatusFilter[])
+              {(['all', 'featured', 'approved', 'unapproved'] as StatusFilter[])
                 .filter(f => f !== 'unapproved' || canSeeUnapproved)
                 .map(f => (
                 <button
@@ -749,7 +744,7 @@ export function GameMods() {
                 onCancelUpdate={(cm) => cancelModUpdate(cm.id)}
                 onReviewUpdate={(cm) => setReviewingUpdate(cm)}
                 onFocusMod={(key) => {
-                  // A required/conflicting mod might be filtered out of view
+                  // A conflicting mod might be filtered out of view
                   // (status filter, installed-only, or a stale search) —
                   // clear those so the row we're jumping to is guaranteed visible.
                   setStatusFilter('all');
@@ -1496,23 +1491,13 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
               </>
             )}
             {cm.status === 'approved' && (
-              <>
-                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => featureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
-                  <Star className="w-3.5 h-3.5 mr-1" /> Feature
-                </Button>
-                <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => requireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
-                  <Lock className="w-3.5 h-3.5 mr-1" /> Require
-                </Button>
-              </>
+              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => featureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
+                <Star className="w-3.5 h-3.5 mr-1" /> Feature
+              </Button>
             )}
             {cm.status === 'featured' && (
               <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => unfeatureMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
                 <Star className="w-3.5 h-3.5 mr-1" /> Unfeature
-              </Button>
-            )}
-            {cm.status === 'required' && (
-              <Button size="sm" variant="ghost" className="hover:bg-[var(--theme-item-selected)]" onClick={() => unrequireMod(cm.id)} style={{ color: 'var(--theme-text-primary)' }}>
-                <Lock className="w-3.5 h-3.5 mr-1" /> Unrequire
               </Button>
             )}
             {cm.status !== 'unapproved' && (

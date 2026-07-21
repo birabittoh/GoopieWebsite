@@ -9,7 +9,6 @@ import {
   onSnapshot,
   query,
   where,
-  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { isOfflineMode } from '../utils/externalLink';
@@ -20,12 +19,11 @@ const MODS_COLLECTION = 'mods';
  * Lifecycle status of a submitted mod within the catalog. `unapproved` mods
  * are only visible to their submitter and admins/developers of the game;
  * `approved` mods are publicly listed; `featured` mods are pinned to the top
- * of the public list; `required` mods are auto-installed/force-enabled for
- * everyone playing the game (and are ordered relative to each other via
- * `order`). Real enforcement of who can transition between these states
- * lives in Firestore security rules — the functions below are the happy path.
+ * of the public list. Real enforcement of who can transition between these
+ * states lives in Firestore security rules — the functions below are the
+ * happy path.
  */
-export type CatalogModStatus = 'unapproved' | 'approved' | 'featured' | 'required';
+export type CatalogModStatus = 'unapproved' | 'approved' | 'featured';
 
 /**
  * A single mod catalog entry, as stored in the `mods` Firestore collection.
@@ -39,8 +37,6 @@ export interface CatalogMod {
   gameId: string;
   recompName: string;
   status: CatalogModStatus;
-  /** Sort priority among `required` mods only (lower loads first); unused for other statuses. */
-  order?: number;
 
   // --- Where to fetch the mod's release asset from ---
   /** `"owner/repo"` on GitHub the mod's releases are published under. */
@@ -118,7 +114,7 @@ export interface CatalogMod {
    * review — see [`requestModUpdate`]. Approving a mod locks its
    * `githubRepo`/`modId` (see `EditModModal`'s copy), so this is how a
    * submitter pushes a new version of their own mod without an admin having
-   * to do it for them or the mod losing its approved/featured/required
+   * to do it for them or the mod losing its approved/featured
    * status via reject-and-resubmit. Only one request lives at a time — a
    * new `requestModUpdate` call overwrites it, and accepting/rejecting
    * clears it back to `null`/undefined.
@@ -141,7 +137,7 @@ export interface PendingModUpdate {
 
 /**
  * Subscribes in real time to the catalog of mods submitted for `gameId`.
- * Returns every status (unapproved/approved/featured/required) — callers
+ * Returns every status (unapproved/approved/featured) — callers
  * are expected to filter by `status` and by `canEditGame`/`submittedBy` to
  * decide what a given viewer should actually see, since Firestore security
  * rules (not this hook) are the real gate on who can *read* unapproved mods.
@@ -363,26 +359,3 @@ export async function unfeatureMod(id: string): Promise<void> {
   await updateDoc(doc(db, MODS_COLLECTION, id), { status: 'approved' as CatalogModStatus });
 }
 
-/** Marks an approved mod as required — auto-installed/force-enabled for every player of the game. */
-export async function requireMod(id: string): Promise<void> {
-  await updateDoc(doc(db, MODS_COLLECTION, id), { status: 'required' as CatalogModStatus });
-}
-
-/** Demotes a required mod back to plain `approved`. */
-export async function unrequireMod(id: string): Promise<void> {
-  await updateDoc(doc(db, MODS_COLLECTION, id), { status: 'approved' as CatalogModStatus });
-}
-
-/**
- * Persists a new load-priority order for the given `required` mod ids (index
- * in the array becomes its `order` field). Uses a single batched write so
- * the reorder applies atomically instead of racing individual `updateDoc`
- * calls against concurrent listeners.
- */
-export async function reorderRequiredMods(ids: string[]): Promise<void> {
-  const batch = writeBatch(db);
-  ids.forEach((id, index) => {
-    batch.update(doc(db, MODS_COLLECTION, id), { order: index });
-  });
-  await batch.commit();
-}
