@@ -1,4 +1,7 @@
+import { FolderOpen } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Button } from './ui/button';
+import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 import type { Game } from '../types/game';
 
 export function CvarSettingsPanel({
@@ -14,13 +17,28 @@ export function CvarSettingsPanel({
   setCvarValue: (id: string, value: any) => void;
   resetCvar: (id: string) => void;
 }) {
+  const canRevealConfigFile = isLauncherVersionAtLeast('1.7.4');
+
   return (
     <div>
-      {!isInCEF && (
-        <div className="flex justify-end mb-4">
-          <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded" style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-text-muted)' }}>
-            launcher only
-          </span>
+      {(!isInCEF || canRevealConfigFile) && (
+        <div className="flex items-center justify-end gap-2 mb-4">
+          {canRevealConfigFile && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hover:bg-[var(--theme-item-selected)]"
+              style={{ color: 'var(--theme-text-primary)' }}
+              onClick={() => { const w = window as any; if (w.openGameConfigFile) w.openGameConfigFile(game.recompName); }}
+            >
+              <FolderOpen className="w-3.5 h-3.5 mr-1" /> Show {game.recompName}.toml
+            </Button>
+          )}
+          {!isInCEF && (
+            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded" style={{ backgroundColor: 'var(--theme-item-selected)', color: 'var(--theme-text-muted)' }}>
+              launcher only
+            </span>
+          )}
         </div>
       )}
       <div className="space-y-4">
