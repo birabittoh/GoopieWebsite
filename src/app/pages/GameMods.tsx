@@ -442,19 +442,34 @@ export function GameMods() {
     });
   }, [rows, search, installedFilter, statusFilter]);
 
+  // Installed mods form one contiguous, drag-reorderable block so dragging
+  // never has to hop over uninstalled rows: required/featured-but-uninstalled
+  // mods stay pinned above it (so they're still noticed), and everything else
+  // uninstalled sinks below it.
+  const rowGroup = useCallback((row: ModRow): 0 | 1 | 2 => {
+    if (row.isInstalled) return 1;
+    const status = row.catalogMod?.status;
+    return status === 'required' || status === 'featured' ? 0 : 2;
+  }, []);
+
   const sortedRows = useMemo(() => {
     const installedOrder = new Map((installedMods ?? []).map((m, i) => [m.id, i]));
     return [...filteredRows].sort((a, b) => {
+      const ga = rowGroup(a);
+      const gb = rowGroup(b);
+      if (ga !== gb) return ga - gb;
+      if (ga === 1) {
+        const oa = a.installed ? installedOrder.get(a.installed.id) ?? 0 : 0;
+        const ob = b.installed ? installedOrder.get(b.installed.id) ?? 0 : 0;
+        return oa - ob;
+      }
       const sa = a.catalogMod ? STATUS_ORDER[a.catalogMod.status] : 4;
       const sb = b.catalogMod ? STATUS_ORDER[b.catalogMod.status] : 4;
-      if (sa !== sb) return sa - sb;
-      const oa = a.installed ? installedOrder.get(a.installed.id) ?? 0 : 0;
-      const ob = b.installed ? installedOrder.get(b.installed.id) ?? 0 : 0;
-      return oa - ob;
+      return sa - sb;
     });
-  }, [filteredRows, installedMods]);
+  }, [filteredRows, installedMods, rowGroup]);
 
-  const showDragHandles = installedFilter === 'installed';
+  const showDragHandles = canManageMods;
 
   // Auto-select the first mod in the list when the page loads or filters change
   useEffect(() => {
