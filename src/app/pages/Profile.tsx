@@ -21,7 +21,7 @@ const statusColors: Record<Game['status'], string> = {
 };
 
 export function Profile() {
-  const { user, logout, canSetRoles, updateUsername, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest } = useAuth();
+  const { user, logout, canSetRoles, updateUsername, updatePicture, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest } = useAuth();
   const { games, saveGame } = useGameStore();
   const navigate = useNavigate();
   const [allUsers, setAllUsers] = useState<{ uid: string; username: string; email: string; role: Role; assignedGames: string[]; picture?: string }[]>([]);
@@ -39,6 +39,10 @@ export function Profile() {
   const [editNameValue, setEditNameValue] = useState('');
   const [editNameStatus, setEditNameStatus] = useState<'idle' | 'saving' | 'error'>('idle');
   const [editNameError, setEditNameError] = useState('');
+  const [editPictureOpen, setEditPictureOpen] = useState(false);
+  const [editPictureValue, setEditPictureValue] = useState('');
+  const [editPictureStatus, setEditPictureStatus] = useState<'idle' | 'saving' | 'error'>('idle');
+  const [editPictureError, setEditPictureError] = useState('');
 
   const totalGames = games.length;
 
@@ -124,13 +128,23 @@ export function Profile() {
         {/* Profile Header */}
         <div className="rounded-lg p-4 md:p-8 mb-8" style={{ backgroundColor: 'var(--theme-card-bg)', backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6">
-            {user?.picture ? (
-              <img src={user.picture} alt={user.username} className="w-20 h-20 md:w-32 md:h-32 rounded-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <div className="w-20 h-20 md:w-32 md:h-32 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))' }}>
-                <span className="text-3xl md:text-5xl font-bold text-white">{user?.username?.[0]?.toUpperCase() || '?'}</span>
+            <button
+              type="button"
+              onClick={() => { setEditPictureValue(user.picture || ''); setEditPictureStatus('idle'); setEditPictureError(''); setEditPictureOpen(true); }}
+              className="relative group rounded-full flex-shrink-0"
+              title="Change profile picture"
+            >
+              {user?.picture ? (
+                <img src={user.picture} alt={user.username} className="w-20 h-20 md:w-32 md:h-32 rounded-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-20 h-20 md:w-32 md:h-32 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to))' }}>
+                  <span className="text-3xl md:text-5xl font-bold text-white">{user?.username?.[0]?.toUpperCase() || '?'}</span>
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/50 transition-colors flex items-center justify-center">
+                <Pencil className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-            )}
+            </button>
             <div className="flex-1 text-center md:text-left">
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 md:gap-3 mb-2">
                 <h2 className="text-2xl md:text-4xl font-bold" style={{ color: 'var(--theme-text-primary)' }}>{user?.username || 'Guest'}</h2>
@@ -496,6 +510,50 @@ export function Profile() {
               style={{ backgroundColor: 'var(--theme-item-selected)' }}
             >
               {editNameStatus === 'saving' ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Picture Dialog */}
+      <Dialog open={editPictureOpen} onOpenChange={setEditPictureOpen}>
+        <DialogContent style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)' }}>
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Change Profile Picture</DialogTitle>
+            <DialogDescription style={{ color: 'var(--theme-text-muted)' }}>
+              Paste a URL to an image to use as your profile picture.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editPictureValue}
+            onChange={e => setEditPictureValue(e.target.value)}
+            placeholder="https://example.com/image.png"
+            style={{ backgroundColor: 'var(--theme-page-bg)', borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+          />
+          {editPictureStatus === 'error' && (
+            <p className="text-sm text-red-500">{editPictureError || 'Failed to update picture. Please try again.'}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPictureOpen(false)} style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)', backgroundColor: 'transparent' }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!editPictureValue.trim() || editPictureStatus === 'saving'}
+              onClick={async () => {
+                setEditPictureStatus('saving');
+                const result = await updatePicture(editPictureValue);
+                if (result === 'ok') {
+                  setEditPictureOpen(false);
+                  setEditPictureStatus('idle');
+                } else {
+                  setEditPictureError(result);
+                  setEditPictureStatus('error');
+                }
+              }}
+              className="text-white"
+              style={{ backgroundColor: 'var(--theme-item-selected)' }}
+            >
+              {editPictureStatus === 'saving' ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

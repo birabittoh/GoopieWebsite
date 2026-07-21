@@ -63,6 +63,7 @@ interface AuthContextType {
   canEditGame: (gameId: string) => boolean;
   canSetRoles: () => boolean;
   updateUsername: (username: string) => Promise<string>;
+  updatePicture: (pictureUrl: string) => Promise<string>;
   setUserRole: (uid: string, role: Role) => Promise<string>;
   assignGame: (uid: string, gameId: string) => Promise<string>;
   unassignGame: (uid: string, gameId: string) => Promise<string>;
@@ -237,6 +238,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return 'ok';
     } catch {
       return 'Failed to update name';
+    }
+  };
+
+  const updatePicture = async (pictureUrl: string): Promise<string> => {
+    if (!user) return 'Not logged in';
+    const trimmed = pictureUrl.trim();
+    if (!trimmed) return 'URL cannot be empty';
+    try {
+      new URL(trimmed);
+    } catch {
+      return 'Please enter a valid URL';
+    }
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { picture: trimmed });
+      setUser(prev => prev ? { ...prev, picture: trimmed } : null);
+      return 'ok';
+    } catch {
+      return 'Failed to update picture';
     }
   };
 
@@ -431,7 +450,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, updateUsername, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest }}>
+    <AuthContext.Provider value={{ user, loading, loginWithGoogle, logout, canEditGame, canSetRoles, updateUsername, updatePicture, setUserRole, assignGame, unassignGame, getAllUsers, submitDeveloperRequest, getDeveloperRequests, approveDeveloperRequest, denyDeveloperRequest, deleteUser, submitDeletionRequest, getDeletionRequests, approveDeletionRequest, denyDeletionRequest }}>
       {children}
     </AuthContext.Provider>
   );
