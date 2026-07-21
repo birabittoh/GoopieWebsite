@@ -120,6 +120,8 @@ interface ModRow {
   isInstalled: boolean;
   /** True when the catalog's published version is newer than what's installed on disk. */
   updateAvailable: boolean;
+  /** True when what's installed on disk (e.g. sideloaded) is newer than the catalog's published version. */
+  localVersionAhead: boolean;
 }
 
 type InstalledFilter = 'all' | 'installed' | 'not-installed';
@@ -403,12 +405,13 @@ export function GameMods() {
       const installed = installedById.get(cm.modId);
       if (installed) usedInstalledIds.add(installed.id);
       const updateAvailable = !!installed && !!cm.version && !!installed.version && isNewerModVersion(cm.version, installed.version);
-      result.push({ key: cm.modId, catalogMod: cm, installed, isInstalled: !!installed, updateAvailable });
+      const localVersionAhead = !!installed && !!cm.version && !!installed.version && isNewerModVersion(installed.version, cm.version);
+      result.push({ key: cm.modId, catalogMod: cm, installed, isInstalled: !!installed, updateAvailable, localVersionAhead });
     }
 
     for (const im of installedMods ?? []) {
       if (usedInstalledIds.has(im.id)) continue;
-      result.push({ key: im.id, installed: im, isInstalled: true, updateAvailable: false });
+      result.push({ key: im.id, installed: im, isInstalled: true, updateAvailable: false, localVersionAhead: false });
     }
 
     return result;
@@ -623,7 +626,7 @@ export function GameMods() {
               ) : sortedRows.map(row => {
                 const status = row.catalogMod?.status;
                 const name = row.catalogMod?.name ?? row.installed?.name ?? row.key;
-                const version = row.catalogMod?.version ?? row.installed?.version;
+                const version = row.installed?.version || row.catalogMod?.version;
                 const author = row.catalogMod?.author ?? row.installed?.author;
                 const icon = row.installed?.icon || row.catalogMod?.iconUrl;
                 const isDragging = dragId === row.installed?.id;
@@ -672,6 +675,15 @@ export function GameMods() {
                             title={`Update available: v${row.catalogMod?.version}`}
                           >
                             <Download className="w-3 h-3" /> Update
+                          </span>
+                        )}
+                        {row.localVersionAhead && (
+                          <span
+                            className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: 'rgba(74,222,128,0.18)', color: '#4ade80' }}
+                            title={`Installed v${row.installed?.version} is newer than the catalog's published v${row.catalogMod?.version}`}
+                          >
+                            Ahead of catalog
                           </span>
                         )}
                       </div>
@@ -1243,7 +1255,7 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
   const [moderationError, setModerationError] = useState<string | null>(null);
 
   const name = cm?.name ?? installed?.name ?? row.key;
-  const version = cm?.version ?? installed?.version;
+  const version = installed?.version || cm?.version;
   const author = cm?.author ?? installed?.author;
   const description = cm?.description ?? installed?.description;
   const requires = installed?.requires ?? cm?.requires ?? [];
@@ -1319,6 +1331,15 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
             {cm ? <StatusBadge status={cm.status} /> : installed && <SideloadBadge />}
             <h2 className="text-lg font-bold truncate" style={{ color: 'var(--theme-text-primary)' }}>{name}</h2>
             {version && <span className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>v{version}</span>}
+            {row.localVersionAhead && (
+              <span
+                className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: 'rgba(74,222,128,0.18)', color: '#4ade80' }}
+                title={`The installed version is newer than the catalog's published v${cm?.version}`}
+              >
+                Ahead of catalog
+              </span>
+            )}
           </div>
           {author && <p className="text-sm" style={{ color: 'var(--theme-text-muted)' }}>by {author}</p>}
           {privileged && cm?.submittedByName && <p className="text-xs" style={{ color: 'var(--theme-text-muted)' }}>Submitted by {cm.submittedByName}</p>}
