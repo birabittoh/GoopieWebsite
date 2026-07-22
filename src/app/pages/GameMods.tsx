@@ -494,7 +494,7 @@ export function GameMods() {
   const hasEnabledCodeMod = (installedMods ?? []).some(m => m.enabled && m.is_code);
 
   return (
-    <div className="flex h-screen flex-col relative" style={{ backgroundColor: 'var(--theme-page-bg)' }}>
+    <div className="flex h-screen flex-col relative overflow-hidden" style={{ backgroundColor: 'var(--theme-page-bg)' }}>
       {!lightboxOpen && (
         <div
           className="h-16 border-b flex items-center px-6 gap-4 relative z-20 shrink-0"
@@ -1053,12 +1053,26 @@ function MediaCarousel({ slides, modName, onLightboxChange }: { slides: MediaSli
     return () => clearTimeout(timer);
   }, [safeIndex, slides]);
 
-  // Destroy all YT.Player instances when iframes get remounted
+  // Destroy the YT.Player for whichever slide's iframe just got remounted.
+  // Only touch the index that actually ticked — nuking every player here
+  // (including the one for the still-visible, never-remounted slide) tore
+  // its iframe out of the DOM from under React and crashed the page. Also
+  // skip indices with no live player: a slide can already be unloaded (e.g.
+  // its unload timer fired while the tab was backgrounded and this effect
+  // already ran for it), and destroying again threw.
+  const prevRemountTickersRef = useRef<Record<number, number>>({});
   useEffect(() => {
-    for (const [, player] of playersRef.current) {
-      try { player.destroy?.(); } catch { /* already gone */ }
+    const prevTickers = prevRemountTickersRef.current;
+    for (const key of Object.keys(remountTickers)) {
+      const i = Number(key);
+      if (remountTickers[i] === prevTickers[i]) continue;
+      const player = playersRef.current.get(i);
+      if (player) {
+        try { player.destroy?.(); } catch { /* already gone */ }
+        playersRef.current.delete(i);
+      }
     }
-    playersRef.current.clear();
+    prevRemountTickersRef.current = remountTickers;
   }, [remountTickers]);
 
   // Create YT.Player instances and wire up onStateChange for auto-advance
@@ -1159,7 +1173,7 @@ function MediaCarousel({ slides, modName, onLightboxChange }: { slides: MediaSli
               {slide.kind === 'video' ? (
                 <iframe
                   key={`vid-${i}-${remountTickers[i] ?? 0}`}
-                  ref={(el) => { if (el) iframeRefs.current.set(i, el); }}
+                  ref={(el) => { if (el) iframeRefs.current.set(i, el); else iframeRefs.current.delete(i); }}
                   src={`https://www.youtube.com/embed/${slide.videoId}?rel=0&enablejsapi=1&origin=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : '')}`}
                   title={`${modName} video ${i + 1}`}
                   className="w-full h-full"
