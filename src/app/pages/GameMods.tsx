@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback, useId } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
+import { useIsMobile } from '../components/ui/use-mobile';
 import { useGesture } from '@use-gesture/react';
 import {
   ArrowLeft, Package, GripVertical, Search, ShieldAlert, AlertTriangle, RefreshCw,
@@ -466,12 +467,16 @@ export function GameMods() {
 
   const showDragHandles = canManageMods;
 
-  // Auto-select the first mod in the list when the page loads or filters change
+  // Auto-select the first mod so the desktop layout's detail panel is never
+  // empty. On mobile the list and detail panel are two separate steps, so a
+  // cleared focusedModId means the user tapped "All mods" and wants the list
+  // — don't fight that by re-selecting a mod out from under them.
+  const isMobile = useIsMobile();
   useEffect(() => {
-    if (!focusedModId && sortedRows.length > 0) {
+    if (!isMobile && !focusedModId && sortedRows.length > 0) {
       selectMod(sortedRows[0].key);
     }
-  }, [sortedRows, focusedModId]);
+  }, [sortedRows, focusedModId, isMobile]);
 
   const focusedRow = sortedRows.find(r => r.key === focusedModId) ?? rows.find(r => r.key === focusedModId);
 
