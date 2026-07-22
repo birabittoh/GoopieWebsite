@@ -1276,9 +1276,9 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
 
   const canInstallFromUrl = isLauncherVersionAtLeast('1.7.0') && typeof (window as any).installModFromUrl === 'function';
 
-  // Installing a mod also pulls in the latest published version of each of
-  // its requirements first (skipping ones already installed), so a player
-  // doesn't have to hunt down and install dependencies by hand one at a time.
+  // Installing (or updating) a mod also pulls in the latest published version of each of
+  // its requirements first, skipping ones already installed at a version meeting the
+  // pin, so a player doesn't have to hunt down and update dependencies by hand.
   const handleInstall = useCallback(async () => {
     if (!cm?.assetUrl || !cm.modId) return;
     const w = window as any;
@@ -1286,10 +1286,15 @@ function ModDetailPanel({ row, recompName, privileged, currentUserUid, allCatalo
 
     setInstallingUrl(true);
     try {
-      const installedIds = new Set((installedMods ?? []).map(m => m.id));
+      const installedById = new Map((installedMods ?? []).map(m => [m.id, m]));
       for (const reqEntry of cm.requires ?? []) {
-        const reqId = reqEntry.split('>=')[0].trim();
-        if (!reqId || reqId === cm.modId || installedIds.has(reqId)) continue;
+        const [reqIdRaw, minVersionRaw] = reqEntry.split('>=');
+        const reqId = reqIdRaw.trim();
+        const minVersion = minVersionRaw?.trim();
+        if (!reqId || reqId === cm.modId) continue;
+        const installedReq = installedById.get(reqId);
+        // Already installed and either unpinned or already meeting the pin: nothing to do.
+        if (installedReq && (!minVersion || !isNewerModVersion(minVersion, installedReq.version))) continue;
         const reqMod = allCatalogMods.find(m => m.modId === reqId);
         if (!reqMod?.assetUrl) continue; // nothing we can auto-install for this requirement
         w.installModFromUrl(recompName, reqMod.assetUrl, reqMod.modId, reqMod.checksum);
