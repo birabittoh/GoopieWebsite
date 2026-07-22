@@ -43,9 +43,20 @@ function getLastRoute(): string | null {
 // explicitly via the sidebar.
 let initialRedirectDone = false;
 
+function hasPendingAutoPlay(): boolean {
+  const w = window as any;
+  return typeof w.getAutoPlayGame === 'function' && !!w.getAutoPlayGame();
+}
+
 function RootRoute() {
   if (!initialRedirectDone) {
     initialRedirectDone = true;
+    // A shortcut launch (`--play <game>`) always needs to land on Library,
+    // since that's the only screen that reads the auto-play flag — otherwise
+    // reopening on a stale `lastRoute` (e.g. Settings) silently drops it.
+    if (hasPendingAutoPlay()) {
+      return <Navigate to="/library" replace />;
+    }
     const lastRoute = getLastRoute();
     if (lastRoute) {
       return <Navigate to={lastRoute} replace />;
