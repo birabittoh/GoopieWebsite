@@ -40,7 +40,64 @@ interface LauncherUpdateDialogProps {
  * for the page to do but show progress until that happens.
  */
 export function LauncherUpdateDialog({ open, onOpenChange }: LauncherUpdateDialogProps) {
-  const { latestVersion, updating, downloadProgress, downloadString, startSelfUpdate } = useLauncherUpdate();
+  const { latestVersion, updating, downloadProgress, downloadString, startSelfUpdate, updateMethod } = useLauncherUpdate();
+
+  // Flatpak (and any packager-managed install) can't replace its own binary:
+  // `/app` is read-only inside the sandbox. Show the command that actually
+  // works instead of a button that would silently do nothing.
+  if (updateMethod !== 'self') {
+    const flatpak = updateMethod === 'flatpak';
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          style={{ backgroundColor: 'var(--theme-card-bg)', borderColor: 'var(--theme-border)' }}
+        >
+          <DialogHeader>
+            <DialogTitle style={{ color: 'var(--theme-text-primary)' }}>Update available</DialogTitle>
+            <DialogDescription style={{ color: 'var(--theme-text-secondary)' }}>
+              A new launcher version{latestVersion ? ` (${latestVersion})` : ''} is available.{' '}
+              {flatpak
+                ? 'This install is managed by Flatpak, so the launcher can’t update itself. Close it and run:'
+                : 'This install is managed by your package manager, so the launcher can’t update itself — update it the way you installed it.'}
+            </DialogDescription>
+          </DialogHeader>
+          {flatpak && (
+            <pre
+              className="text-sm rounded-md border p-3 overflow-x-auto select-text"
+              style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)' }}
+            >
+              flatpak update xyz.goopie.launcher
+            </pre>
+          )}
+          {flatpak && (
+            <p className="text-sm" style={{ color: 'var(--theme-text-secondary)' }}>
+              If that reports nothing to do, the Flatpak was installed from a standalone
+              bundle without an update source. Reinstall it once from{' '}
+              <a
+                href="https://goopie.xyz/#/downloads"
+                onClick={e => { e.preventDefault(); openExternal('https://goopie.xyz/#/downloads'); }}
+                className="underline cursor-pointer"
+              >
+                the downloads page
+              </a>{' '}
+              and future updates will arrive normally.
+            </p>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button
+                variant="outline"
+                style={{ borderColor: 'var(--theme-border)', color: 'var(--theme-text-primary)', backgroundColor: 'transparent' }}
+              >
+                Got it
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     // While updating, ignore close attempts (Escape / overlay click / the X

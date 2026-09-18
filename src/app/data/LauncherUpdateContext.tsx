@@ -26,6 +26,14 @@ interface LauncherUpdateContextType {
   latestVersion: string | null;
   /** True when `window.SelfUpdateLauncher` is available (always true in the Tauri launcher). */
   canSelfUpdate: boolean;
+  /** How a new version actually reaches this install (launcher 1.9.2+):
+   *  - `self`     — the built-in updater replaces the binary (the default, and
+   *                 what older launchers are assumed to do);
+   *  - `flatpak`  — the sandbox can't rewrite itself; the user runs
+   *                 `flatpak update`;
+   *  - `external` — a packager disabled the updater; their package manager owns
+   *                 the binary. */
+  updateMethod: 'self' | 'flatpak' | 'external';
   /** True while a self-update download/apply is in progress. */
   updating: boolean;
   /** 0-100, or -1 when idle (mirrors the native `download_progress`). */
@@ -60,6 +68,7 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [canSelfUpdate, setCanSelfUpdate] = useState(false);
+  const [updateMethod, setUpdateMethod] = useState<'self' | 'flatpak' | 'external'>('self');
   const [updating, setUpdating] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(-1);
   const [downloadString, setDownloadString] = useState('');
@@ -85,6 +94,8 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
 
     const check = () => {
       const info = w.CheckForLauncherUpdate();
+      // Missing on launchers older than 1.9.2, which only ever self-updated.
+      if (info?.updateMethod) setUpdateMethod(info.updateMethod);
       if (info?.hasUpdate) {
         setUpdateAvailable(true);
         setLatestVersion(info.latestVersion ?? null);
@@ -160,6 +171,7 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
       if (info) {
         setUpdateAvailable(!!info.hasUpdate);
         setLatestVersion(info.latestVersion ?? null);
+        if (info.updateMethod) setUpdateMethod(info.updateMethod);
       }
       setLastCheckedAt(Date.now());
       setChecking(false);
@@ -172,6 +184,7 @@ export function LauncherUpdateProvider({ children }: { children: ReactNode }) {
         updateAvailable,
         latestVersion,
         canSelfUpdate,
+        updateMethod,
         updating,
         downloadProgress,
         downloadString,
