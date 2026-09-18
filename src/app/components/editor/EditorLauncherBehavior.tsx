@@ -200,6 +200,17 @@ export function EditorLauncherBehavior({ form, update, readOnly }: Props) {
         description={form.setGameDataRootToAssets ? '— Adds --game_data_root=".../assets" when launching' : '— Do not pass --game_data_root'}
         disabled={readOnly}
       />
+      {form.setGameDataRootToAssets === true && (
+        <EditorToggle
+          checked={form.gameDataRootViaCli !== false}
+          onChange={v => update('gameDataRootViaCli', v ? undefined : false)}
+          label="Pass game_data_root as a CLI flag"
+          description={form.gameDataRootViaCli !== false
+            ? '— Uses --game_data_root=".../assets" (also written to the TOML as a fallback)'
+            : '— TOML config only; use this if the game discards the CLI override at startup'}
+          disabled={readOnly}
+        />
+      )}
       <EditorToggle
         checked={form.isXBLA === true}
         onChange={v => update('isXBLA', v || undefined)}

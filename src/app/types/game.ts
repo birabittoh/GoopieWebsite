@@ -125,6 +125,16 @@ export interface Game {
   setGameDataRootToAssets?: boolean;
 
   /**
+   * When `setGameDataRootToAssets` is true, controls how `game_data_root`
+   * reaches the game: as a `--game_data_root` CLI flag (default, `true`/unset)
+   * or solely through the per-build TOML config. Some SDK builds re-apply
+   * their compiled-in cvar default after the command line is parsed but
+   * before the TOML is loaded, which silently discards the CLI override —
+   * switching this to `false` works around that without touching the CLI arg.
+   */
+  gameDataRootViaCli?: boolean;
+
+  /**
    * When true, the save manager is disabled for this game.
    */
   disableSaveManager?: boolean;
