@@ -767,7 +767,7 @@ export function Settings() {
                 <div className="font-mono text-sm" style={{ color: 'var(--theme-text-muted)' }}>
                   {launcherVersion}
                 </div>
-                {canRecheck && (
+                {canRecheck && !offline && (
                   <button
                     onClick={recheck}
                     disabled={checking}
