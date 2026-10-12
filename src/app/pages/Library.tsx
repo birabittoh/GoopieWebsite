@@ -299,6 +299,9 @@ export function Library() {
   }, [githubRepo, selectedTag, selectedGame?.githubReleaseUrl]);
 
   const canInstall = !!(githubRepo || selectedGame?.githubReleaseUrl);
+  // With a GitHub repo the tag/asset come from the fetched release list; until
+  // that has loaded for *this* game there is nothing valid to install.
+  const installReady = !githubRepo || (!releasesLoading && !!selectedTag && !!selectedAsset);
 
   const selectionMismatch = useMemo(() => {
     if (installation.installedBuilds.length === 0) return false;
@@ -369,6 +372,7 @@ export function Library() {
     if (!selectedGame) return;
     const w = window as any;
     if (typeof w.Update !== 'function') return;
+    if (!installReady) return;
     w.Update(
       selectedGame.recompName,
       updateInfo.prefix ?? '',
@@ -388,7 +392,7 @@ export function Library() {
       setSelectedAsset(updateInfo.asset);
     }
     installation.setUpdating(true);
-  }, [selectedGame, updateInfo, newerReleaseAvailable, setSelectedTag, setSelectedAsset, installation]);
+  }, [selectedGame, installReady, updateInfo, newerReleaseAvailable, setSelectedTag, setSelectedAsset, installation]);
 
   const removeBuild = useCallback((build: { name: string; version?: string; asset?: string }) => {
     setPendingRemoveBuild(build);
@@ -573,6 +577,7 @@ export function Library() {
     selectedBuild,
     installedBuilds: installation.installedBuilds,
     canInstall,
+    installReady,
     selectionMismatch,
     newerReleaseAvailable,
     newerInstalledBuild,

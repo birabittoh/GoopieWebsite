@@ -473,6 +473,8 @@ function useLauncherEnv(): LauncherEnv {
  * Hook that fetches the releases for a game and exposes the user's
  * version/build selection plus a "show nightlies" toggle.
  */
+const EMPTY_RELEASES: GameRelease[] = [];
+
 export function useGameReleases(game: Game | undefined) {
   const repo = useMemo(() => (game ? getGitHubRepo(game) : null), [game]);
   const { platform, arch } = useLauncherEnv();
@@ -492,7 +494,10 @@ export function useGameReleases(game: Game | undefined) {
     const installs = w.getProtonInstallations();
     return Array.isArray(installs) && installs.length > 0;
   }, [platform]);
-  const [releases, setReleases] = useState<GameRelease[]>([]);
+  // Releases are tagged with the repo they were fetched for so a game switch
+  // never exposes the previous game's tags/assets while the new fetch is pending.
+  const [fetched, setFetched] = useState<{ repo: string | null; list: GameRelease[] }>({ repo: null, list: [] });
+  const releases = useMemo(() => (fetched.repo === repo ? fetched.list : EMPTY_RELEASES), [fetched, repo]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [releasesStale, setReleasesStale] = useState(false);
@@ -538,7 +543,7 @@ export function useGameReleases(game: Game | undefined) {
   // Fetch releases.
   useEffect(() => {
     if (!repo) {
-      setReleases([]);
+      setFetched({ repo: null, list: [] });
       setReleasesStale(false);
       setReleasesUpdatedAt(undefined);
       return;
@@ -549,7 +554,7 @@ export function useGameReleases(game: Game | undefined) {
     fetchReleases(repo, refreshTick > 0)
       .then(list => {
         if (cancelled) return;
-        setReleases(list);
+        setFetched({ repo, list });
         const info = getReleasesCacheInfo(repo);
         setReleasesStale(info?.stale ?? false);
         setReleasesUpdatedAt(info?.fetchedAt);

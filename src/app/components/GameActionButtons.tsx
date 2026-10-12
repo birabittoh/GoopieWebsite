@@ -42,6 +42,8 @@ export interface GameActionButtonsProps {
   selectedBuild: InstalledBuild | null | undefined;
   installedBuilds: InstalledBuild[];
   canInstall: boolean;
+  /** False while the release list is still loading / unavailable, so an install would have no valid tag. */
+  installReady?: boolean;
   selectionMismatch: boolean;
   newerReleaseAvailable: boolean;
   newerInstalledBuild: InstalledBuild | null;
@@ -106,6 +108,7 @@ export function GameActionButtons({
   selectedBuild,
   installedBuilds,
   canInstall: canInstallProp,
+  installReady = true,
   selectionMismatch,
   newerReleaseAvailable,
   newerInstalledBuild,
@@ -298,7 +301,7 @@ export function GameActionButtons({
               </p>
             )}
             {canInstall && (selectionMismatch || newerReleaseAvailable) && (
-              <Button className={`bg-[#1a6bc4] hover:bg-[#2080e0] text-white ${btnPxSm}`} onClick={onTriggerUpdate}>
+              <Button className={`bg-[#1a6bc4] hover:bg-[#2080e0] text-white ${btnPxSm}`} onClick={onTriggerUpdate} disabled={!installReady}>
                 <Download className={`${iconSize} ${iconMr}`} /> {selectedBuild ? 'Update' : 'Install'}
               </Button>
             )}
@@ -335,7 +338,7 @@ export function GameActionButtons({
             {!canInstall ? null : (noCompatibleBuilds && !selectedBuild) ? (
               noSupportedBuildsNotice
             ) : (
-              <Button className={`bg-[#1a6bc4] hover:bg-[#2080e0] text-white ${btnPx}`} onClick={onTriggerUpdate}>
+              <Button className={`bg-[#1a6bc4] hover:bg-[#2080e0] text-white ${btnPx}`} onClick={onTriggerUpdate} disabled={!installReady}>
                 <Download className={`${iconSize} ${iconMr}`} /> {selectedBuild ? 'Update' : 'Install'}
               </Button>
             )}
