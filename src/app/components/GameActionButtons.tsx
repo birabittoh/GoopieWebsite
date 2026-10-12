@@ -105,7 +105,7 @@ export function GameActionButtons({
   exeUpdated,
   selectedBuild,
   installedBuilds,
-  canInstall,
+  canInstall: canInstallProp,
   selectionMismatch,
   newerReleaseAvailable,
   newerInstalledBuild,
@@ -133,6 +133,7 @@ export function GameActionButtons({
   // installed (present in installedBuilds) — before that there's nothing to
   // browse mods against yet. In the plain web build there's no install state
   // at all, so the button just opens the catalog in read-only browse mode.
+  const canInstall = canInstallProp && !game.externalLauncherUrl;
   const showModsButton =
     !!onOpenMods &&
     !!game.modsEnabled &&
@@ -200,20 +201,29 @@ export function GameActionButtons({
   const iconSize = compact ? 'w-4 h-4' : 'w-5 h-5';
   const iconMr = compact ? 'mr-1' : 'mr-2';
 
-  if (game.externalLauncherUrl) {
+  // External games are distributed through another launcher, but users who
+  // installed builds/assets before the game went external must still be able
+  // to play and remove them. Only the install/update paths are disabled.
+  const isExternal = !!game.externalLauncherUrl;
+  const hasLocalInstall = isInCEF && (isoInstalled || installedBuilds.length > 0);
+  const getLauncherButton = isExternal && (
+    <a
+      href={game.externalLauncherUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => { if (isInCEF) { e.preventDefault(); openExternal(game.externalLauncherUrl!); } }}
+    >
+      <Button className={`text-white ${btnPx}`} style={{ backgroundColor: 'var(--theme-accent)' }}>
+        <ExternalLink className={`${iconSize} ${iconMr}`} />
+        Get Launcher
+      </Button>
+    </a>
+  );
+
+  if (isExternal && !hasLocalInstall) {
     return (
       <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)]'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
-        <a
-          href={game.externalLauncherUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => { if (isInCEF) { e.preventDefault(); openExternal(game.externalLauncherUrl!); } }}
-        >
-          <Button className={`text-white ${btnPx}`} style={{ backgroundColor: 'var(--theme-accent)' }}>
-            <ExternalLink className={`${iconSize} ${iconMr}`} />
-            Get Game
-          </Button>
-        </a>
+        {getLauncherButton}
       </div>
     );
   }
@@ -243,6 +253,7 @@ export function GameActionButtons({
 
   return (<>
     <div className={compact ? '' : 'p-4 rounded-lg shadow bg-[var(--theme-card-bg)] mb-4'} style={compact ? undefined : { backdropFilter: 'var(--theme-backdrop-blur)', WebkitBackdropFilter: 'var(--theme-backdrop-blur)' }}>
+      {getLauncherButton && <div className="mb-3">{getLauncherButton}</div>}
       {extracting ? (
         <div className="flex items-center gap-2">
           <RefreshCw className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} animate-spin`} style={{ color: 'var(--theme-accent)' }} />
@@ -374,7 +385,7 @@ export function GameActionButtons({
       )}
       {isoInstalled && !extracting && !updating && (
         <div className="mt-3">
-          <GameVersionPicker
+          {!isExternal && <GameVersionPicker
             compact={compact}
             game={game}
             visibleReleases={versionPicker.visibleReleases}
@@ -396,7 +407,7 @@ export function GameActionButtons({
             stale={versionPicker.stale}
             updatedAt={versionPicker.updatedAt ?? undefined}
             onRefresh={versionPicker.onRefresh}
-          />
+          />}
           <InstalledBuildsList builds={installedBuilds} recompName={game.recompName} onPlay={onRequestPlay} onClose={onCloseRunningGame} onRemove={onRemoveBuild} runningBuild={runningBuildForSelectedGame} compact={compact} />
         </div>
       )}
