@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Game, Platform } from '../types/game';
-import { Plus, Filter, Star, GripVertical } from 'lucide-react';
+import { Plus, Filter, Play, Star, GripVertical } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
 import { Checkbox } from './ui/checkbox';
 import type { GameRatingInfo } from '../data/useRatings';
@@ -71,6 +71,9 @@ interface GameListProps {
   allTags: string[];
   platformFilters: Platform[];
   onPlatformFiltersChange: (platforms: Platform[]) => void;
+  installedOnly?: boolean;
+  /** Omit to hide the "installed only" toggle (e.g. launchers that predate it). */
+  onInstalledOnlyChange?: (installedOnly: boolean) => void;
   gameRatings?: Record<string, GameRatingInfo>;
   /** User-controlled favorites order, from useFavorites. */
   favoriteIds?: string[];
@@ -79,7 +82,7 @@ interface GameListProps {
   className?: string;
 }
 
-export function GameList({ games, selectedGameId, onSelectGame, onCreateGame, statusFilters, onStatusFiltersChange, tagFilters, onTagFiltersChange, hideExternal, onHideExternalChange, allTags, platformFilters, onPlatformFiltersChange, gameRatings, favoriteIds, onReorderFavorites, className }: GameListProps) {
+export function GameList({ games, selectedGameId, onSelectGame, onCreateGame, statusFilters, onStatusFiltersChange, tagFilters, onTagFiltersChange, hideExternal, onHideExternalChange, allTags, platformFilters, onPlatformFiltersChange, installedOnly, onInstalledOnlyChange, gameRatings, favoriteIds, onReorderFavorites, className }: GameListProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [dragFavId, setDragFavId] = useState<string | null>(null);
   const favListRef = useRef<HTMLDivElement>(null);
@@ -170,6 +173,17 @@ export function GameList({ games, selectedGameId, onSelectGame, onCreateGame, st
           >
             <Filter className="w-4 h-4" />
           </button>
+          {onInstalledOnlyChange && (
+            <button
+              onClick={() => onInstalledOnlyChange(!installedOnly)}
+              className="w-8 h-8 rounded flex items-center justify-center transition-colors"
+              style={{ backgroundColor: installedOnly ? 'var(--theme-accent)' : 'var(--theme-item-selected)', color: installedOnly ? 'white' : 'var(--theme-text-primary)' }}
+              title="Installed only"
+              aria-pressed={installedOnly}
+            >
+              <Play className="w-4 h-4" />
+            </button>
+          )}
           {onCreateGame && (
             <button
               onClick={onCreateGame}

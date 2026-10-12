@@ -22,7 +22,7 @@ import { useCloudSaveToasts } from '../hooks/useCloudSaveToasts';
 import { BackgroundAudioPlayer } from '../components/BackgroundAudioPlayer';
 import { Markdown } from '../components/Markdown';
 import { useNews } from '../data/useNews';
-import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, detectAssetPlatform, isPlatformCompatible, isArchCompatible, findInstalledBuild, useGameReleases } from '../data/useGameReleases';
+import { buildReleaseDownloadPrefix, pickDefaultAsset, sortAssetsByRelevance, detectAssetPlatform, isPlatformCompatible, isArchCompatible, findInstalledBuild, readInstalledBuilds, useGameReleases } from '../data/useGameReleases';
 import { pickAssetPreservingTuStatus } from '../utils/updateRequired';
 import { isLauncherVersionAtLeast } from '../utils/launcherVersion';
 import { isInLauncher, isInTauriLauncher, getCachedImageUrl } from '../utils/externalLink';
@@ -57,6 +57,7 @@ export function Library() {
   const [tagFilters, setTagFilters] = useState<string[]>([]);
   const [hideExternal, setHideExternal] = useState(false);
   const [platformFilters, setPlatformFilters] = useState<Platform[]>([]);
+  const [installedOnly, setInstalledOnly] = useState(false);
   const [audioKey, setAudioKey] = useState(0);
   const [audioMuted, setAudioMuted] = useState(() => {
     try { return localStorage.getItem('goopie:audioMuted') === '1'; } catch { return false; }
@@ -91,6 +92,17 @@ export function Library() {
     return Array.from(tagSet).sort();
   }, [visibleGames]);
 
+  // `getInstalledBuilds` is a synchronous bridge call per game, so only query
+  // it while the "installed only" filter is actually on.
+  const installedGameIds = useMemo(() => {
+    if (!installedOnly) return null;
+    const ids = new Set<string>();
+    for (const game of visibleGames) {
+      if (readInstalledBuilds(game.recompName).length > 0) ids.add(game.id);
+    }
+    return ids;
+  }, [installedOnly, visibleGames]);
+
   const filteredGames = useMemo(() => {
     let totalSum = 0;
     let totalCount = 0;
@@ -109,6 +121,7 @@ export function Library() {
         const matchesSearch = game.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             game.og_developer.toLowerCase().includes(searchQuery.toLowerCase());
         if (!matchesSearch) return false;
+        if (installedGameIds && !installedGameIds.has(game.id)) return false;
         if (favOrder.has(game.id)) return true;
         const matchesStatus = statusFilters.length === 0 || statusFilters.includes(game.status);
         const matchesTags = tagFilters.length === 0 || tagFilters.some(tag => game.Tags.includes(tag));
@@ -136,7 +149,7 @@ export function Library() {
         if (wA !== wB) return wB - wA;
         return vb - va;
       });
-  }, [searchQuery, visibleGames, statusFilters, tagFilters, hideExternal, platformFilters, gameRatings, favorites, isInCEF]);
+  }, [searchQuery, visibleGames, statusFilters, tagFilters, hideExternal, platformFilters, installedGameIds, gameRatings, favorites, isInCEF]);
 
   useEffect(() => {
     if (urlRecompName && visibleGames.length > 0 && appliedUrlRef.current !== urlRecompName) {
@@ -643,6 +656,8 @@ export function Library() {
           allTags={allTags}
           platformFilters={platformFilters}
           onPlatformFiltersChange={setPlatformFilters}
+          installedOnly={installedOnly}
+          onInstalledOnlyChange={isTauri ? setInstalledOnly : undefined}
           gameRatings={gameRatings}
           favoriteIds={favorites}
           onReorderFavorites={reorderFavorites}
