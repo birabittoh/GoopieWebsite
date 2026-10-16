@@ -139,12 +139,17 @@ export function pickDefaultAsset(game: Pick<Game, 'recompName' | 'preferredAsset
  * name, in which case this returns `undefined` and the asset is treated as
  * compatible with every platform (never hidden, never penalised in ranking).
  */
-export function detectAssetPlatform(name: string): 'Windows' | 'Linux' | 'macOS' | undefined {
+export function detectAssetPlatform(name: string): 'Windows' | 'Linux' | 'macOS' | 'Android' | undefined {
   const lower = name.toLowerCase();
-  if (lower.includes('windows') || lower.includes('win32') || lower.includes('win64') || lower.endsWith('.exe')) {
+  // Android never runs under the launcher; it's reported so it gets hidden.
+  if (lower.includes('android') || lower.endsWith('.apk') || lower.endsWith('.aab')) {
+    return 'Android';
+  }
+  // `win-amd64`-style platform ids need a word boundary so "darwin-" isn't a hit.
+  if (lower.includes('windows') || lower.includes('win32') || lower.includes('win64') || /(^|[^a-z])win[-_]/.test(lower) || lower.endsWith('.exe')) {
     return 'Windows';
   }
-  if (lower.includes('macos') || lower.includes('darwin') || lower.includes('osx') || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
+  if (lower.includes('macos') || lower.includes('darwin') || lower.includes('osx') || /(^|[^a-z])mac[-_]/.test(lower) || lower.endsWith('.dmg') || lower.endsWith('.pkg')) {
     return 'macOS';
   }
   if (lower.includes('linux') || lower.endsWith('.appimage')) {
